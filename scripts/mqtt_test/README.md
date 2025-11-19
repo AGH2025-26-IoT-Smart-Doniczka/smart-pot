@@ -13,11 +13,11 @@ Installed 1 package in 18ms
 ## Publishing a message
 
 ```bash
-uv run python -m mqtt_publish.py
+uv run python -m mqtt_publish
 ```
 
 ## Listening for a message
 
 ```bash
-uv run python -m mqtt_listen.py
+uv run python -m mqtt_listen
 ```
