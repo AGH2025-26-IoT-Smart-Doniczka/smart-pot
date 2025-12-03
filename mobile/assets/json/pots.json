@@ -1,0 +1,112 @@
+[
+  {
+    "potId": "POT-001",
+    "userPublicKey": "abc123",
+    "data": {
+      "air_temp": 22.5,
+      "air_humidity": 58.2,
+      "air_pressure": 1012.3,
+      "soil_moisture": 35.4,
+      "illuminance": 700.0
+    }
+  },
+  {
+    "potId": "POT-002",
+    "userPublicKey": "abc123",
+    "data": {
+      "air_temp": 19.8,
+      "air_humidity": 65.0,
+      "air_pressure": 1008.9,
+      "soil_moisture": 42.1,
+      "illuminance": 500.0
+    }
+  },
+  {
+    "potId": "POT-003",
+    "userPublicKey": "def456",
+    "data": {
+      "air_temp": 24.1,
+      "air_humidity": 55.3,
+      "air_pressure": 1015.6,
+      "soil_moisture": 31.2,
+      "illuminance": 850.0
+    }
+  },
+  {
+    "potId": "POT-004",
+    "userPublicKey": "def456",
+    "data": {
+      "air_temp": 20.3,
+      "air_humidity": 70.5,
+      "air_pressure": 1005.7,
+      "soil_moisture": 47.9,
+      "illuminance": 420.0
+    }
+  },
+  {
+    "potId": "POT-005",
+    "userPublicKey": "ghi789",
+    "data": {
+      "air_temp": 26.0,
+      "air_humidity": 50.0,
+      "air_pressure": 1013.0,
+      "soil_moisture": 29.5,
+      "illuminance": 950.0
+    }
+  },
+  {
+    "potId": "POT-006",
+    "userPublicKey": "ghi789",
+    "data": {
+      "air_temp": 18.7,
+      "air_humidity": 68.2,
+      "air_pressure": 1009.8,
+      "soil_moisture": 52.3,
+      "illuminance": 380.0
+    }
+  },
+  {
+    "potId": "POT-007",
+    "userPublicKey": "xyz111",
+    "data": {
+      "air_temp": 23.2,
+      "air_humidity": 60.1,
+      "air_pressure": 1011.2,
+      "soil_moisture": 37.0,
+      "illuminance": 750.0
+    }
+  },
+  {
+    "potId": "POT-008",
+    "userPublicKey": "xyz111",
+    "data": {
+      "air_temp": 21.5,
+      "air_humidity": 62.4,
+      "air_pressure": 1007.9,
+      "soil_moisture": 44.8,
+      "illuminance": 610.0
+    }
+  },
+  {
+    "potId": "POT-009",
+    "userPublicKey": "jkl222",
+    "data": {
+      "air_temp": 25.6,
+      "air_humidity": 53.9,
+      "air_pressure": 1014.4,
+      "soil_moisture": 33.7,
+      "illuminance": 890.0
+    }
+  },
+  {
+    "potId": "POT-010",
+    "userPublicKey": "jkl222",
+    "data": {
+      "air_temp": 17.9,
+      "air_humidity": 72.5,
+      "air_pressure": 1006.5,
+      "soil_moisture": 49.6,
+      "illuminance": 340.0
+    }
+  }
+]
