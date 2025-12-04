@@ -97,6 +97,7 @@ class _DeviceTreeState extends State<DeviceTree> {
       setState(() {
         _step = PairingStep.wifiCredentials;
       });
+
     } catch (e) {
       print("Błąd połączenia: $e");
       await device.disconnect();
