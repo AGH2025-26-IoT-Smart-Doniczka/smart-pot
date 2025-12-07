@@ -172,7 +172,7 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
                       final hasScanned = filteredResults.isNotEmpty;
 
                       if (!hasConnected && !hasBonded && !hasScanned) {
-                        return const Center(child: Text("No devices found"));
+                        return const Center(child: Text("Nie znaleziono urządzeń"));
                       }
 
                       return ListView(
