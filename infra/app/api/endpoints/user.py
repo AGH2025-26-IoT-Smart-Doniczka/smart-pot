@@ -8,7 +8,7 @@ from ..utils.jwt_token import create_access_token
 
 router = APIRouter()
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED)
 def register(data: RegisterRequest):
     if email_exists(data.email):
         raise HTTPException(
@@ -19,8 +19,8 @@ def register(data: RegisterRequest):
             }
         )
 
-    password_hash, salt = hash_password(data.password)
-    user = create_user(data.email, data.username, password_hash, salt)
+    password_hash = hash_password(data.password)
+    user = create_user(data.email, data.username, password_hash)
     token = create_access_token(user)
 
     return {
