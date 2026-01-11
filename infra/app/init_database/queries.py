@@ -27,7 +27,6 @@ queries = [
         pot_id UUID NOT NULL REFERENCES connections(pot_id) ON DELETE CASCADE,
         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         air_temp REAL,
-        air_humidity INTEGER,
         air_pressure INTEGER,
         soil_moisture REAL,
         illuminance INTEGER,
