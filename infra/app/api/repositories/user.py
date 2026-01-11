@@ -19,17 +19,17 @@ def email_exists(email: str) -> bool:
     return exists
 
 
-def create_user(email: str, username: str, password_hash: str, salt: str) -> dict:
+def create_user(email: str, username: str, password_hash: str) -> dict:
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute(
             """
-            INSERT INTO users (email, password_hash, salt, username)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO users (email, password_hash, username)
+            VALUES (%s, %s, %s)
             RETURNING user_id, email, username;
             """,
-            (email, password_hash, salt, username)
+            (email, password_hash, username)
         )
         user = cur.fetchone()
         conn.commit()
