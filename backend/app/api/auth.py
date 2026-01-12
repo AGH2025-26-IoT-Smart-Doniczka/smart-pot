@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, status
 
 from ..utils.jwt_token import create_access_token
 from ..schemas.auth import LoginRequest
-from ..repositories.auth import verify_user_credentials
+from ..integrations.repositories.auth import verify_user_credentials
 
 
 router = APIRouter()

@@ -30,7 +30,9 @@ services:
       start_period: 5s
 
   app:
-    build: ./app
+    build:
+      context: ..
+      dockerfile: infra/backend/Dockerfile
     ports:
       - "8000:8000"
     depends_on:
