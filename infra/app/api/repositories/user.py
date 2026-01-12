@@ -1,39 +1,27 @@
-from ..db.client import get_connection
+from psycopg2 import IntegrityError
 from psycopg2.extras import RealDictCursor
 
-
-def email_exists(email: str) -> bool:
-    conn = get_connection()
-    cur = conn.cursor()
-
-    cur.execute(
-        "SELECT 1 FROM users WHERE email = %s LIMIT 1;",
-        (email,)
-    )
-
-    exists = cur.fetchone() is not None
-
-    cur.close()
-    conn.close()
-
-    return exists
+from ..db.client import get_connection
 
 
 def create_user(email: str, username: str, password_hash: str) -> dict:
     conn = get_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+
     try:
-        cur.execute(
-            """
-            INSERT INTO users (email, password_hash, username)
-            VALUES (%s, %s, %s)
-            RETURNING user_id, email, username;
-            """,
-            (email, password_hash, username)
-        )
-        user = cur.fetchone()
-        conn.commit()
-        return user
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    INSERT INTO users (email, password_hash, username)
+                    VALUES (%s, %s, %s)
+                    RETURNING user_id, email, username;
+                    """,
+                    (email, password_hash, username)
+                )
+                return cur.fetchone()
+
+    except IntegrityError:
+        raise
+
     finally:
-        cur.close()
         conn.close()
