@@ -16,7 +16,7 @@ queries = [
     """
     CREATE TABLE IF NOT EXISTS pots (
         pot_id UUID PRIMARY KEY DEFAULT uuid_generate_v1(),
-        admin_lock BOOLEAN DEFAULT FALSE,
+        measure_interval_sec INTEGER DEFAULT 300,
         max_temperature NUMERIC(4,1) DEFAULT 30.0,
         min_temperature NUMERIC(4,1) DEFAULT 10.0,
         humidity_thresholds JSONB DEFAULT '{

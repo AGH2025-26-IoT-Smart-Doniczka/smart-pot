@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException, status
 
 from ..utils.jwt_token import create_access_token
-from ..utils.hash import hash_password
 from ..schemas.auth import LoginRequest
 from ..repositories.auth import verify_user_credentials
 
@@ -10,23 +9,32 @@ router = APIRouter()
     
 @router.post("/login", status_code=status.HTTP_200_OK)
 def login(data: LoginRequest):
-    user, message = verify_user_credentials(data.email, data.password)
+    try:
+        user = verify_user_credentials(data.email, data.password)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"message": "Internal server error"}
+        )
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
-                "message": "Sign-in failed.",
-                "error": message
+                "message": "Sign-in failed",
+                "error": "Invalid credentials"
             }
         )
+
     token = create_access_token(user)
 
     return {
-        "message": message,
+        "message": "Login successful",
         "user": {
+            "id": str(user["user_id"]),
             "email": user["email"],
-            "username": user["username"],
-            "id": str(user["user_id"])
+            "username": user["username"]
         },
-        "jwt": token
+        "access_token": token,
+        "token_type": "Bearer"
     }
