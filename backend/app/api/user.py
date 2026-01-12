@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, status
 from psycopg2 import IntegrityError
 
 from ..schemas.user import RegisterRequest
-from ..repositories.user import create_user
+from ..integrations.repositories.user import create_user
 from ..utils.hash import hash_password
 from ..utils.jwt_token import create_access_token
 

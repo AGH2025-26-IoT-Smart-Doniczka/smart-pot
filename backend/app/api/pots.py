@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status
 
 from ..schemas.pots import WaterPlantRequest
-from ..mqtt_service.MQTTClient import MQTTClient
+from ..integrations.mqtt.MQTTClient import MQTTClient
 from ..schemas.mqtt.pots import WaterPlantMqttRequest
 
 router = APIRouter()
