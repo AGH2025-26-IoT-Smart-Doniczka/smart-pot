@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:smart_pot_mobile_app/models/pot_data.dart';
+import 'package:smart_pot_mobile_app/screens/plants/pot_detail_screen.dart';
 
 class PotMiniCard extends StatelessWidget {
   final String statusEmoji;
@@ -70,70 +72,93 @@ class PotMiniCard extends StatelessWidget {
 
 
 class PotCard extends StatelessWidget {
-  final Map<String, dynamic> pot;
+  final Pot pot; // Teraz widget przyjmuje silnie typowany obiekt
 
   const PotCard({super.key, required this.pot});
 
   @override
   Widget build(BuildContext context) {
-    final data = pot['data'];
+    // Wyciągamy dane dla wygody
+    final temp = pot.data.airTemp.toStringAsFixed(1);
+    final moisture = pot.data.soilMoisture.toStringAsFixed(0);
+    final isHappy = pot.data.soilMoisture > 30;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      elevation: 3,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AspectRatio(
-            aspectRatio: 16 / 9,
-            child: Image.asset(
-              'assets/images/test_pot.png',
-              fit: BoxFit.cover,
-              errorBuilder: (c, _, __) => Container(
-                color: Colors.grey.shade800,
-                child: const Center(
-                  child: Icon(Icons.local_florist, size: 48),
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PotDetailScreen(pot: pot),
+          ),
+        );
+      },
+      child: Card(
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              // Ikona / Obrazek
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: isHappy ? Colors.green.shade100 : Colors.orange.shade100,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    isHappy ? '🌿' : '🥀',
+                    style: const TextStyle(fontSize: 30),
+                  ),
                 ),
               ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Doniczka: ${pot['potId']}",
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              const SizedBox(width: 16),
+              // Teksty
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      pot.name,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text("ID: ${pot.potId}", style: Theme.of(context).textTheme.bodySmall),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                _buildRow("Temperatura powietrza", "${data['air_temp']} °C"),
-                _buildRow("Wilgotność powietrza", "${data['air_humidity']} %"),
-                _buildRow("Ciśnienie", "${data['air_pressure']} hPa"),
-                _buildRow("Wilgotność gleby", "${data['soil_moisture']} %"),
-                _buildRow("Oświetlenie", "${data['illuminance']} lx"),
-              ],
-            ),
+              ),
+              // Parametry po prawej
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.thermostat, size: 16, color: Colors.grey),
+                      const SizedBox(width: 4),
+                      Text("$temp°C"),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                          Icons.water_drop,
+                          size: 16,
+                          color: isHappy ? Colors.blue : Colors.orange
+                      ),
+                      const SizedBox(width: 4),
+                      Text("$moisture%"),
+                    ],
+                  ),
+                ],
+              )
+            ],
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
-        ],
+        ),
       ),
     );
   }
