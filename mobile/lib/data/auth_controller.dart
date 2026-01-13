@@ -46,6 +46,15 @@ class AuthController extends ChangeNotifier {
     );
   }
 
+  Future<bool> register(String email, String password, String username) async {
+    return _authenticate(endpoint: '/user',
+        body: {
+          'email': email,
+          'password': password,
+          'username': username
+        });
+  }
+
   Future<bool> login(String email, String password) async {
     return _authenticate(
       endpoint: '/auth/login',
