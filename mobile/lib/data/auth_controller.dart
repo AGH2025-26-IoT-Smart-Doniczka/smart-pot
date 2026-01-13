@@ -4,11 +4,10 @@ import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:smart_pot_mobile_app/models/user_model.dart';
-import 'package:http/http.dart' as http
+import 'package:http/http.dart' as http;
 class AuthController extends ChangeNotifier {
 
-  // Mock backend - json-blob URL
-  static const String _baseUrl = 'https://jsonblob.com/api/jsonBlob/019ba2d5-7e45-79be-8a2b-cb153ff7f35e';
+  static const String _baseUrl = 'http://192.168.0.21:8000';
   final _storage = const FlutterSecureStorage(); //bezpieczny magazyn do trzymania tokena jwt
 
   User? _currentUser;
@@ -22,7 +21,7 @@ class AuthController extends ChangeNotifier {
 
 
   Future<void> tryAutoLogin() async {
-    final token = await _storage.read(key: 'jwt');
+    final token = await _storage.read(key: 'jwt_token');
     final userDataString = await _storage.read(key: 'user_data');
 
     if(token != null && userDataString != null){
@@ -31,81 +30,50 @@ class AuthController extends ChangeNotifier {
         _currentUser = User.fromLocal(userData, token);
         notifyListeners();
       }catch(e){
-        logout();
+        await logout();
       }
     }
+  }
+
+  Future<bool> register(String email, String password, String username) async {
+    return _authenticate(endpoint: '/user',
+        body: {
+          'email': email,
+          'password': password,
+          'username': username
+        });
   }
 
   Future<bool> login(String email, String password) async {
-    _setIsLoading(true);
-    // TODO: Potem zmień na prawdziwy endpoint z backendu do loginu
-    final url = Uri.parse(_baseUrl);
-
-    try{
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
+    return _authenticate(endpoint: '/auth/login',
+        body: {
           'email': email,
           'password': password
-        }),
-      );
-
-      final data = json.decode(response.body);
-      if(response.statusCode == 200 || response.statusCode == 201){
-        await _saveUserSession(data);
-        _errorMessage = null;
-        return true;
-      }else if (response.statusCode == 403){
-        _errorMessage = data['error'] ?? 'Błędny login lub hasło';
-        return false;
-      }else{
-        _errorMessage = "Błąd logowania: ${response.statusCode}";
-        return false;
-      }
-    }catch(e){
-      _errorMessage = "Błąd połączenia: $e";
-      return false;
-    }finally{
-      _setIsLoading(false);
-
-    }
+        });
   }
 
-  Future<bool> register(String email, String password, String username) async{
+  Future<bool> _authenticate({required String endpoint, required Map<String, String> body}) async{
     _setIsLoading(true);
-
-    // TODO: Potem zmień na prawdziwy endpoint z backendu
-    final url = Uri.parse(_baseUrl);
-
+    _errorMessage=null;
     try{
+      final url = Uri.parse('$_baseUrl$endpoint');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'email': email,
-          'password': password,
-          'username': username,
-        }),
+        body: json.encode(body),
       );
-
       final data = json.decode(response.body);
 
-      if(response.statusCode == 201 ){
+      if(response.statusCode >= 200 && response.statusCode < 300){
         await _saveUserSession(data);
-        _errorMessage = null;
         return true;
-      }else if(response.statusCode == 403){
-      //email już jest używany
-        _errorMessage = data['error'] ?? 'Rejestracja nieudana';
-        return false;
       }else{
-        _errorMessage = 'Błąd serwera: ${response.statusCode}';
+        _errorMessage = data['detail'] ?? 'Błąd autoryzacji ${response.statusCode}';
         return false;
       }
     }catch(e){
-      _errorMessage = "Błąd połączenia: $e";
-      return false;
+        _errorMessage = 'Błąd połączenia: ${e}. Sprawdź czy serwer działa i adres jest poprawny';
+        return false;
     }finally{
       _setIsLoading(false);
     }
@@ -121,11 +89,11 @@ class AuthController extends ChangeNotifier {
     _currentUser = User.fromApiResponse(data);
 
     if(_currentUser!.token != null){
-      await _storage.write(key: 'jwt', value: _currentUser!.token);
+      await _storage.write(key: 'jwt_token', value: _currentUser!.token);
     }
 
-    // Zapisuje podstawowe informacje o użytkowniku do storage
-    await _storage.write(key: 'user_data', value: json.encode(data['user']));
+    final userData = data['user'] ?? {};
+    await _storage.write(key: 'user_data', value: json.encode(userData));
     notifyListeners();
   }
 
