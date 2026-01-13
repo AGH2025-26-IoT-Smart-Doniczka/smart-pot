@@ -23,7 +23,7 @@ class SmartPotApp extends StatelessWidget {
         AppRoutes.register: (context) => RegisterScreen(),
         AppRoutes.home: (context) => MainShell(),
         AppRoutes.plants: (context) => MyPotsScreen(),
-        AppRoutes.addPlant: (context) => DeviceTree()
+        AppRoutes.addPlant: (context) => DeviceTree(),
       },
       themeMode: theme.mode,
       theme: ThemeData(
