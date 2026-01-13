@@ -23,6 +23,7 @@ def on_connect(
     )
     client.subscribe("devices/+/telemetry")
     client.subscribe("devices/+/setup")
+    client.subscribe("devices/+/watering/cmd")
 
 
 def message_callback(
