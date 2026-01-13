@@ -2,6 +2,4 @@ user backend
 topic readwrite #
 
 user AABBCCDDEEFF
-topic write devices/AABBCCDDEEFF/telemetry
-topic write devices/AABBCCDDEEFF/setup
-topic read devices/AABBCCDDEEFF/config
+topic readwrite #
