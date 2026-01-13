@@ -112,6 +112,19 @@ class PotsController extends ChangeNotifier {
       _isAlertsLoading = false;
       notifyListeners();
     }
+
+    // try {
+    //   await Future.delayed(const Duration(seconds: 1));
+    //
+    //   final userPotsJson = _mockPots.where((pot) => pot['userPublicKey'] == user.id).toList();
+    //
+    //   _pots = userPotsJson.map((json) => Pot.fromJson(json)).toList();
+    // }catch (e){
+    //   _error = "Błąd pobierania danych doniczek: $e";
+    // } finally{
+    //   _isLoading = false;
+    //   notifyListeners();
+    // }
   }
 
   Future<void> fetchPots() async {
