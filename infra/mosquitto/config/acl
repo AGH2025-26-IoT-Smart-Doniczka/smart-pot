@@ -1,7 +1,9 @@
 user backend
 topic readwrite #
 
-user AABBCCDDEEFF
-topic write devices/AABBCCDDEEFF/telemetry
-topic write devices/AABBCCDDEEFF/setup
-topic read devices/AABBCCDDEEFF/config
+user mqtt-agent
+topic read users/add
+
+pattern write devices/%u/telemetry
+pattern write devices/%u/setup
+pattern read devices/%u/config
