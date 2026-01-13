@@ -13,12 +13,12 @@ class User {
   });
 
   factory User.fromApiResponse(Map<String, dynamic> json) {
-    final userData = json['user'];
+    final userData = json['user'] ?? {};
     return User(
       id: userData['id']?.toString() ?? '',
       email: userData['email'] ?? '',
       username: userData['username'] ?? '',
-      token: json['jwt']
+      token: json['access_token']
     );
   }
 
