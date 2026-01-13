@@ -44,8 +44,13 @@ def on_message(
         password = data["password"]
 
         subprocess.run(
-            ["mosquitto_passwd", "-b", PASSWD_PATH, username, password], check=True
+            ["mosquitto_passwd", PASSWD_PATH, username],
+            input=f"{password}\n{password}\n",
+            text=True,
+            check=True,
         )
+
+        subprocess.run(["pkill", "-HUP", "mosquitto"], check=True)
     except Exception as e:
         print(f"Error: {e}")
 
