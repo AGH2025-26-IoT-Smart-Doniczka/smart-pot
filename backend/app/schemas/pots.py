@@ -60,3 +60,7 @@ class ConfigChangeRequest(BaseModel):
         if self.min_temp >= self.max_temp:
             raise ValueError("min_temp must be < max_temp")
         return self
+
+
+class ChangeOwnerRequest(BaseModel):
+    user_id: str

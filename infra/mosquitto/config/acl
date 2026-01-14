@@ -9,3 +9,4 @@ pattern write devices/%u/setup
 pattern read devices/%u/config/cmd
 pattern read devices/%u/watering/cmd
 pattern write devices/%u/watering/status
+pattern write devices/%u/hard-reset

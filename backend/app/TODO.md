@@ -8,6 +8,8 @@ Testy:
 
 retain na /status - w sumie ma sens
 
+dodanie autentyfikacji z jwt do actions uzytkownika
+
 env vars - ujednolicenie
 
 walidatory danych wejściowych i repo

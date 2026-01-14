@@ -57,9 +57,15 @@ def main() -> None:
             },
         }
 
+        reset = {
+            "timestamp": time.time(),
+        }
+
         publish(client, f"devices/{UUID}/telemetry", telemetry)
         time.sleep(0.5)
         publish(client, f"devices/{UUID}/config/cmd", setup)
+        time.sleep(0.5)
+        publish(client, f"devices/{UUID}/hard-reset", reset)
         time.sleep(0.5)
         publish(client, "devices/TEST_ID/setup", setup)
         # Returns good response code but ...
