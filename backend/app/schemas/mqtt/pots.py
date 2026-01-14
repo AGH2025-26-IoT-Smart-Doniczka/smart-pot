@@ -15,6 +15,11 @@ class WateringStatusMqttResponse(BaseModel):
         return v
     
 
+class AddUserRequest(BaseModel):
+    username: str
+    password: str
+    
+
 class TelemetryData(BaseModel):
     lux: conint(ge=0)   # int >= 0
     tem: float
@@ -22,6 +27,12 @@ class TelemetryData(BaseModel):
     pre: float
 
 class TelemetryMqttMessage(BaseModel):
-    potId: constr(min_length=12, max_length=12)  # dokładnie 12 znaków
     timestamp: float
     data: TelemetryData
+
+
+class ConfigChangeMqttRequest(BaseModel):
+	lux: int
+	moi: list[int]
+	tem: list[float] 
+	sle: int

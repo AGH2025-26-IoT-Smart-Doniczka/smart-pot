@@ -6,7 +6,7 @@ from pydantic import ValidationError
 from app.schemas.mqtt.pots import (
     TelemetryMqttMessage
 )
-from app.integrations.repositories.pots import telemetry_insert
+from app.integrations.repositories.pots import measures_insert
 
 
 TelemetryEvent = Tuple[str, Any]
@@ -46,18 +46,20 @@ def telemetry_worker() -> None:
             print("Validation error", e)
             continue
         else:
-            print("Parsed timestamp:", data.timestamp)
-            print("Pot ID:", data.potId)
+            print("unix timestamp:", data.timestamp)
             print("Lux:", data.data.lux)
 
         pot_id = topic.split("/")[1]
+        print("Pot ID:", pot_id)
 
-        telemetry_insert(
-            pot_id=pot_id,
-            timestamp=data.timestamp,
-            air_temp=data.data.tem,
-            air_pressure=data.data.pre,
-            soil_moisture=data.data.moi,
-            illuminance=data.data.lux
-        )
-
+        try:
+            measures_insert(
+                pot_id=pot_id,
+                timestamp=data.timestamp,
+                air_temp=data.data.tem,
+                air_pressure=data.data.pre,
+                soil_moisture=data.data.moi,
+                illuminance=data.data.lux
+            )
+        except Exception as e:
+            print(f"Error inserting telemetry data for pot {pot_id}: {e}")

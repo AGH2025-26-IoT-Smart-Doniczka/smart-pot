@@ -7,7 +7,7 @@ from paho.mqtt import enums, properties, reasoncodes
 BROKER_HOST = os.environ.get("MQTT_HOST", "localhost")
 BROKER_PORT = int(os.environ.get("MQTT_PORT", "1883"))
 USERNAME = os.environ.get("MQTT_USER", "TEST_POT_ADD")
-PASSWORD = os.environ.get("MQTT_PASSWORD", "27427f5e3f834b1db8a16bf913e9acdf")
+PASSWORD = os.environ.get("MQTT_PASSWORD", "70474d24fe464c688066c0d899c27a09")
 
 
 def on_connect(
@@ -22,7 +22,7 @@ def on_connect(
         f"({reason_code.getName()})",
     )
     client.subscribe("devices/+/telemetry", qos=1)
-    client.subscribe("devices/+/setup", qos=1)
+    client.subscribe("devices/+/config/cmd", qos=1)
 
 
 def message_callback(

@@ -6,6 +6,6 @@ topic read users/add
 
 pattern write devices/%u/telemetry
 pattern write devices/%u/setup
-pattern read devices/%u/config
+pattern read devices/%u/config/cmd
 pattern read devices/%u/watering/cmd
 pattern write devices/%u/watering/status
