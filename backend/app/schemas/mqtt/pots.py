@@ -6,13 +6,12 @@ class WaterPlantMqttRequest(BaseModel):
     dur: int  # Duration in seconds
 
 class WateringStatusMqttResponse(BaseModel):
-    stat: str
-    fin: int
+    water: int
 
-    @field_validator("fin")
-    def check_fin(cls, v):
+    @field_validator("water")
+    def check_water(cls, v):
         if v not in (0, 1):
-            raise ValueError(f"fin must be 0 or 1, got {v}")
+            raise ValueError(f"water must be 0 or 1, got {v}")
         return v
     
 

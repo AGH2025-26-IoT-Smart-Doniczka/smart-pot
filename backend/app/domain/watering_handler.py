@@ -29,10 +29,9 @@ def watering_status_worker() -> None:
 
         print(
             f"[watering_status_worker] pot={pot_id} "
-            f"finished={data.fin} status={data.stat}"
+            f"finished={not data.water}"
         )
 
-        is_watering = not bool(data.fin)  # finished = 0 -> is_watering = True
-        print(f"[watering_status_worker] pot={pot_id} is_watering={is_watering} status={data.stat}")
-
+        is_watering = bool(data.water)  # water = 1 -> is_watering = True
+        print(f"[watering_status_worker] pot={pot_id} is_watering={is_watering}")
         watering_update(pot_id=pot_id, is_watering=is_watering)
