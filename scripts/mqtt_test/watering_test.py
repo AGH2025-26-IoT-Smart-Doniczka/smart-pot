@@ -17,9 +17,8 @@ from paho.mqtt import properties as mqtt_properties
 BROKER_HOST = os.environ.get("MQTT_HOST", "localhost")
 BROKER_PORT = int(os.environ.get("MQTT_PORT", "1883"))
 
-DEVICE_UUID = os.environ.get("MQTT_DEVICE_UUID", "TEST_POT_ADD_2")
-# DEVICE_PASSWORD = os.environ.get("MQTT_DEVICE_PASSWORD", "27427f5e3f834b1db8a16bf913e9acdf")
-DEVICE_PASSWORD = os.environ.get("MQTT_DEVICE_PASSWORD", "c2ef26da28dd41e9bab2f9e30040df30")
+DEVICE_UUID = os.environ.get("MQTT_DEVICE_UUID", "TEST_POT_ADD")
+DEVICE_PASSWORD = os.environ.get("MQTT_DEVICE_PASSWORD", "70474d24fe464c688066c0d899c27a09")
 
 COMMAND_TOPIC = f"devices/{DEVICE_UUID}/watering/cmd"
 STATUS_TOPIC = f"devices/{DEVICE_UUID}/watering/status"

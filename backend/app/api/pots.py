@@ -1,37 +1,56 @@
 import os
+from decimal import Decimal
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Query
 
 from ..schemas.pots import (
     WaterPlantRequest, 
-    PairingRequest, 
-    AddUserRequest,
+    PairingRequest,
+    ConfigChangeRequest
 )
 from ..integrations.mqtt.MQTTClient import MQTTClient
-from ..schemas.mqtt.pots import WaterPlantMqttRequest
+from ..schemas.mqtt.pots import (
+    WaterPlantMqttRequest,
+    AddUserRequest,
+    ConfigChangeMqttRequest
+)
 from ..integrations.repositories.pots import (
     get_watering_status,
     pot_exists,
     pot_has_owner, 
-    insert_connection
+    insert_connection,
+    get_history_measures,
+    update_config
 )
 
 router = APIRouter()
 
 
+def json_safe(obj):
+    if isinstance(obj, Decimal):
+        return float(obj)
+    if isinstance(obj, dict):
+        return {k: json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [json_safe(v) for v in obj]
+    return obj
+
+
+# split functionality into smaller functions later ( ﾉ ﾟｰﾟ)ﾉ
 @router.post("/{pot_id}/pairing", status_code=status.HTTP_201_CREATED)
 def pair_plant_with_user(pot_id: str, data: PairingRequest):
     has_owner = pot_has_owner(pot_id)
-    print(f"Pot {pot_id} has owner: {has_owner}")
-    if has_owner is not None and has_owner[0] == data.user_id:
-        return {
+    result = {
             "role": "owner",
             "mqtt": {
                 "username": pot_id,
                 "password": ""
             }
-        }
+    }
+    print(f"Pot {pot_id} has owner: {has_owner}")
+    if has_owner is not None and has_owner[0] == data.user_id:
+        return result
 
     try:
         insert_connection(pot_id, data.user_id, has_owner)
@@ -42,14 +61,9 @@ def pair_plant_with_user(pot_id: str, data: PairingRequest):
         )
 
     if has_owner is not None:
-        return {
-            "role": "user",
-            "mqtt": {
-                "username": pot_id,
-                "password": ""
-            }
-        }
-
+        result["role"] = "user"
+        return result
+    
     mqtt_password = uuid4().hex
     client_id = f"backend-pairing-{uuid4().hex[:8]}"
 
@@ -69,12 +83,23 @@ def pair_plant_with_user(pot_id: str, data: PairingRequest):
     finally:
         mqqt_client.disconnect()
 
+    result["mqtt"]["password"] = mqtt_password
+    return result
+
+
+@router.get("/{pot_id}/measures")
+def get_measures(pot_id: str, count: int = Query(10, ge=1, le=100)):
+    try:
+        measures = get_history_measures(pot_id, count)
+    except ValueError as ve:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(ve)
+        )
     return {
-            "role": "owner",
-            "mqtt": {
-                "username": pot_id,
-                "password": mqtt_password
-            }
+        "pot_id": pot_id,
+        "count": count, 
+        "measures" : measures
         }
 
 
@@ -124,3 +149,61 @@ def water_status(pot_id: str):
         return {"is_watering": True}
     else:
         return {"is_watering": False}
+
+
+@router.post("/{pot_id}/actions/config", status_code=status.HTTP_202_ACCEPTED)
+def config_change(pot_id: str, data: ConfigChangeRequest):
+    ILLUMINANCE_MAP = {
+        "low": 0,
+        "medium": 1,
+        "high": 2,
+    }
+
+    payload = data.model_dump()
+
+    payload["illuminance"] = ILLUMINANCE_MAP[payload["illuminance"]]
+
+    try:
+        updated = update_config(pot_id, payload)
+    except ValueError as ve:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(ve),
+        )
+
+    if not updated:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Pot not found",
+        )
+
+    client_id = f"backend-config-{uuid4().hex[:8]}"
+
+    new_config = json_safe({
+        "lux": updated["illuminance_type"],
+        "moi": [
+            updated["humidity_thresholds"]["very_low"],
+            updated["humidity_thresholds"]["low"],
+            updated["humidity_thresholds"]["high"],
+            updated["humidity_thresholds"]["very_high"],
+        ],
+        "tem": [
+            updated["min_temperature"],
+            updated["max_temperature"],
+        ],
+        "sle": updated["measure_interval_sec"],
+    })
+
+    mqtt_client = MQTTClient(client_id=client_id, persistent_session=False)
+    mqtt_client.connect()
+
+    try:
+        topic = f"devices/{pot_id}/config/cmd"
+        mqtt_client.publish(topic, new_config, qos=1)
+    finally:
+        mqtt_client.disconnect()
+
+    return {
+        "pot_id": pot_id,
+        "newConfig": new_config,
+    }

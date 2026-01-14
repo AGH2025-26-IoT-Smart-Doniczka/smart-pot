@@ -42,7 +42,7 @@ queries = [
     """
     CREATE TABLE IF NOT EXISTS measures (
         pot_id TEXT NOT NULL REFERENCES pots(pot_id) ON DELETE CASCADE,
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
         air_temp NUMERIC(4,1),
         air_pressure INTEGER,
         soil_moisture NUMERIC(4,1),

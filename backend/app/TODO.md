@@ -9,3 +9,22 @@ Testy:
 retain na /status - w sumie ma sens
 
 env vars - ujednolicenie
+
+walidatory danych wejściowych i repo
+
+security w przesylaniu
+
+reset hasła
+zmiana hasla
+wyloguj?
+hard reset
+config
+measures
+
+dodac usuwanie adminów?
+dodawanie adminów?
+usuwanie zwyklych userów?
+zmien rosline -> usun dane historyczne
+
+powiadomienia alerty
+wykresy measures

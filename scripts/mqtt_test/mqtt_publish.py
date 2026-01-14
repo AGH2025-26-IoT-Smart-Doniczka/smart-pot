@@ -8,8 +8,8 @@ import paho.mqtt.enums as mqtt_enums
 
 BROKER_HOST = os.environ.get("MQTT_HOST", "localhost")
 BROKER_PORT = int(os.environ.get("MQTT_PORT", "1883"))
-UUID = os.environ.get("MQTT_DEVICE_UUID", "AABBCCDDEEFF")
-PASSWORD = os.environ.get("MQTT_DEVICE_PASSWORD", "device-password")
+UUID = os.environ.get("MQTT_DEVICE_UUID", "TEST_POT_ADD")
+PASSWORD = os.environ.get("MQTT_DEVICE_PASSWORD", "70474d24fe464c688066c0d899c27a09")
 
 
 def publish(
@@ -39,16 +39,13 @@ def main() -> None:
 
     try:
         telemetry = {
-        "type": "telemetry",
-        "version": 1,
-        "data": {
-            "potId": "pot-1",
-            "airTemp": 23.4,
-            "airHumidity": 55.1,
-            "airPressure": 1012.3,
-            "soilMoisture": 0.42,
-            "illuminance": 1200.0,
-            },
+            "timestamp": time.time(),
+            "data": {
+                "lux": 1650,
+                "tem": 50.1,
+                "moi": 89,
+                "pre": 1474.2
+            }
         }
 
         setup = {
@@ -57,12 +54,12 @@ def main() -> None:
         "data": {
             "potId": "pot-1",
             "email": "user@example.com",
-        },
+            },
         }
 
         publish(client, f"devices/{UUID}/telemetry", telemetry)
         time.sleep(0.5)
-        publish(client, f"devices/{UUID}/setup", setup)
+        publish(client, f"devices/{UUID}/config/cmd", setup)
         time.sleep(0.5)
         publish(client, "devices/TEST_ID/setup", setup)
         # Returns good response code but ...
