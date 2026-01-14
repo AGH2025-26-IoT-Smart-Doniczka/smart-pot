@@ -6,8 +6,8 @@ from paho.mqtt import enums, properties, reasoncodes
 
 BROKER_HOST = os.environ.get("MQTT_HOST", "localhost")
 BROKER_PORT = int(os.environ.get("MQTT_PORT", "1883"))
-USERNAME = os.environ.get("MQTT_USER", "backend")
-PASSWORD = os.environ.get("MQTT_PASSWORD", "backend-password")
+USERNAME = os.environ.get("MQTT_USER", "TEST_POT_ADD")
+PASSWORD = os.environ.get("MQTT_PASSWORD", "27427f5e3f834b1db8a16bf913e9acdf")
 
 
 def on_connect(
@@ -37,7 +37,7 @@ def message_callback(
 def main() -> None:
     client = mqtt_client.Client(
         callback_api_version=enums.CallbackAPIVersion.VERSION2,
-        client_id="backend",
+        client_id=USERNAME,
         protocol=mqtt_client.MQTTv5,
     )
     client.username_pw_set(USERNAME, PASSWORD)

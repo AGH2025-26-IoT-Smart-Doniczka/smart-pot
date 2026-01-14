@@ -50,4 +50,9 @@ queries = [
         PRIMARY KEY (pot_id, timestamp)
     )
     """,
+    """
+    CREATE UNIQUE INDEX IF NOT EXISTS one_owner_per_pot
+    ON connections (pot_id)
+    WHERE is_owner = TRUE;
+    """,
 ]
