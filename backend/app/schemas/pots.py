@@ -5,7 +5,11 @@ from .roles import ConnectionRole
 
 
 class WaterPlantRequest(BaseModel):
-    duration: int  # Duration in seconds
+   duration: int  # Duration in seconds
+
+
+class WateringStatusResponse(BaseModel):
+    is_watering: bool
 
 
 class WateringStatusResponse(BaseModel):
