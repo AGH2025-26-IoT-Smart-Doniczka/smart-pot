@@ -23,6 +23,7 @@ def publish(
         qos=1,
         retain=False,
     )
+    msg_info.wait_for_publish()
     print(f"Message sent with response code: {msg_info.rc.name}")
 
 
@@ -34,8 +35,10 @@ def main() -> None:
     )
     client.username_pw_set(UUID, PASSWORD)
     client.connect(BROKER_HOST, BROKER_PORT, keepalive=60)
+    client.loop_start()
 
-    telemetry = {
+    try:
+        telemetry = {
         "type": "telemetry",
         "version": 1,
         "data": {
@@ -45,29 +48,29 @@ def main() -> None:
             "airPressure": 1012.3,
             "soilMoisture": 0.42,
             "illuminance": 1200.0,
-        },
-    }
+            },
+        }
 
-    setup = {
+        setup = {
         "type": "pairing",
         "version": 1,
         "data": {
             "potId": "pot-1",
             "email": "user@example.com",
         },
-    }
+        }
 
-    publish(client, f"devices/{UUID}/telemetry", telemetry)
-    time.sleep(0.5)
-    publish(client, f"devices/{UUID}/setup", setup)
-    time.sleep(0.5)
-    publish(client, "devices/TEST_ID/setup", setup)
-    # Returns good response code but ...
-    # 1763315902: Denied PUBLISH from AABBCCDDEEFF (d0, q1, r0, m3, 'devices/TEST_ID/setup', ... (90 bytes))
-    # Server logs tell us that this publish was denied
-
-    client.loop(2)
-    client.disconnect()
+        publish(client, f"devices/{UUID}/telemetry", telemetry)
+        time.sleep(0.5)
+        publish(client, f"devices/{UUID}/setup", setup)
+        time.sleep(0.5)
+        publish(client, "devices/TEST_ID/setup", setup)
+        # Returns good response code but ...
+        # 1763315902: Denied PUBLISH from AABBCCDDEEFF (d0, q1, r0, m3, 'devices/TEST_ID/setup', ... (90 bytes))
+        # Server logs tell us that this publish was denied
+    finally:
+        client.loop_stop()
+        client.disconnect()
 
 
 if __name__ == "__main__":
