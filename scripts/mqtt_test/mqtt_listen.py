@@ -1,5 +1,4 @@
 import os
-import time
 from typing import Any
 
 import paho.mqtt.client as mqtt_client
@@ -14,7 +13,7 @@ PASSWORD = os.environ.get("MQTT_PASSWORD", "70474d24fe464c688066c0d899c27a09")
 def on_connect(
     client: mqtt_client.Client,
     _userdata: Any,  # noqa: ANN401
-    flags: mqtt_client.ConnectFlags,
+    _flags: mqtt_client.ConnectFlags,
     reason_code: reasoncodes.ReasonCode,
     _props: properties.Properties | None,
 ) -> None:
@@ -41,7 +40,7 @@ def main() -> None:
         client_id=USERNAME,
         protocol=mqtt_client.MQTTv5,
     )
-    client.username_pw_set(DEVICE_UUID, DEVICE_PASSWORD)
+    client.username_pw_set(USERNAME, PASSWORD)
     client.on_connect = on_connect
     client.on_message = message_callback
     connect_props = properties.Properties(properties.PacketTypes.CONNECT)
