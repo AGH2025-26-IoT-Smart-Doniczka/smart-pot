@@ -1,0 +1,282 @@
+{
+	"info": {
+		"_postman_id": "9b97c9b1-1c71-4bb4-8878-610b290deeaf",
+		"name": "SmartPot",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "39629244"
+	},
+	"item": [
+		{
+			"name": "register",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n\t\"email\": \"eliza@gmail.com\",\r\n\t\"password\": \"elizashaslo\",\r\n\t\"username\": \"Eliza\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://0.0.0.0:8000/user/register",
+					"protocol": "http",
+					"host": [
+						"0",
+						"0",
+						"0",
+						"0"
+					],
+					"port": "8000",
+					"path": [
+						"user",
+						"register"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "login",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"email\": \"eliza@gmail.com\",\r\n    \"password\": \"elizashaslo\"\r\n}\r\n"
+				},
+				"url": {
+					"raw": "http://0.0.0.0:8000/auth/login",
+					"protocol": "http",
+					"host": [
+						"0",
+						"0",
+						"0",
+						"0"
+					],
+					"port": "8000",
+					"path": [
+						"auth",
+						"login"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "water command",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n\t\"duration\": 15\r\n}\r\n"
+				},
+				"url": {
+					"raw": "http://0.0.0.0:8000/pots/TEST_POT_ADD/actions/water",
+					"protocol": "http",
+					"host": [
+						"0",
+						"0",
+						"0",
+						"0"
+					],
+					"port": "8000",
+					"path": [
+						"pots",
+						"TEST_POT_ADD",
+						"actions",
+						"water"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "water status",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://0.0.0.0:8000/pots/TEST_POT_ADD/actions/water/status",
+					"protocol": "http",
+					"host": [
+						"0",
+						"0",
+						"0",
+						"0"
+					],
+					"port": "8000",
+					"path": [
+						"pots",
+						"TEST_POT_ADD",
+						"actions",
+						"water",
+						"status"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "pairing",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n\t\"user_id\": \"e94fb4f1-1258-448f-aa72-1c1495d0f0e0\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://0.0.0.0:8000/pots/TEST_POT_ADD/pairing",
+					"protocol": "http",
+					"host": [
+						"0",
+						"0",
+						"0",
+						"0"
+					],
+					"port": "8000",
+					"path": [
+						"pots",
+						"TEST_POT_ADD",
+						"pairing"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "measures",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": ""
+				},
+				"url": {
+					"raw": "http://0.0.0.0:8000/pots/TEST_POT_ADD/measures?count=10",
+					"protocol": "http",
+					"host": [
+						"0",
+						"0",
+						"0",
+						"0"
+					],
+					"port": "8000",
+					"path": [
+						"pots",
+						"TEST_POT_ADD",
+						"measures"
+					],
+					"query": [
+						{
+							"key": "count",
+							"value": "10"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "config",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n\t\"sleep_interval_sec\": 10,\r\n\t\"max_temp\": 30.2,\r\n\t\"min_temp\": 9.2,\r\n\t\"humidity\": {\r\n\t\t\"min\": 10,\r\n\t\t\"opt_min\": 30,\r\n\t\t\"opt_max\": 60,\r\n\t\t\"max\": 90\r\n\t},\r\n\t\"illuminance\": \"low\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://0.0.0.0:8000/pots/TEST_POT_ADD/actions/config",
+					"protocol": "http",
+					"host": [
+						"0",
+						"0",
+						"0",
+						"0"
+					],
+					"port": "8000",
+					"path": [
+						"pots",
+						"TEST_POT_ADD",
+						"actions",
+						"config"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
