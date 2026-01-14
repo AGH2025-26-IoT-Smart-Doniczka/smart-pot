@@ -9,7 +9,7 @@ from ..utils.jwt_token import create_access_token
 
 router = APIRouter()
 
-@router.post("", status_code=status.HTTP_201_CREATED)
+@router.post("/register", status_code=status.HTTP_201_CREATED)
 def register(data: RegisterRequest):
     password_hash = hash_password(data.password)
 
