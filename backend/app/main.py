@@ -13,6 +13,7 @@ from app.integrations.mqtt.MQTTClient import MQTTClient
 from app.domain.watering_handler import watering_status_handler
 from app.domain.telemetry_handler import telemetry_handler
 from app.domain.start_handlers import start_workers
+from app.domain.hard_reset_handler import hard_reset_handler
 
 mqtt_client = MQTTClient(
     client_id=os.environ.get("MQTT_CLIENT_ID", "backend-service"),
@@ -31,6 +32,7 @@ async def lifespan(app: FastAPI):
 
     await loop.run_in_executor(None, lambda: mqtt_client.subscribe("devices/+/watering/status", watering_status_handler, qos=1))
     await loop.run_in_executor(None, lambda: mqtt_client.subscribe("devices/+/telemetry", telemetry_handler, qos=1))
+    await loop.run_in_executor(None, lambda: mqtt_client.subscribe("devices/+/hard-reset", hard_reset_handler, qos=1))
 
     yield
 

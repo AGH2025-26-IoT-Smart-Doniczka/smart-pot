@@ -7,22 +7,26 @@ from fastapi import APIRouter, HTTPException, status, Query
 from ..schemas.pots import (
     WaterPlantRequest, 
     PairingRequest,
-    ConfigChangeRequest
+    ConfigChangeRequest,
+    ChangeOwnerRequest
 )
 from ..integrations.mqtt.MQTTClient import MQTTClient
 from ..schemas.mqtt.pots import (
     WaterPlantMqttRequest,
-    AddUserRequest,
-    ConfigChangeMqttRequest
+    AddUserRequest
 )
 from ..integrations.repositories.pots import (
     get_watering_status,
     pot_exists,
-    pot_has_owner, 
+    user_exists,
+    pot_has_owner,
+    get_pot_owner_username,
     insert_connection,
     get_history_measures,
-    update_config
+    update_config,
+    update_owner_connection
 )
+from ..domain.hard_reset_handler import wait_for_hard_reset
 
 router = APIRouter()
 
@@ -206,4 +210,37 @@ def config_change(pot_id: str, data: ConfigChangeRequest):
     return {
         "pot_id": pot_id,
         "newConfig": new_config,
+    }
+
+
+@router.post("/{pot_id}/permissions/change-owner", status_code=status.HTTP_202_ACCEPTED)
+def change_owner(pot_id: str, data: dict):
+    new_user_id: str = data["user_id"]
+
+    fail = {
+        "changed": False,
+        "reason": "",
+        "owner": get_pot_owner_username(pot_id)
+    }
+
+    if not pot_exists(pot_id):
+        fail["reason"] = "Pot not found"
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=fail)
+    if not user_exists(new_user_id):
+        fail["reason"] = "User not found"
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=fail)
+
+    if not wait_for_hard_reset(pot_id, timeout=180):
+        fail["reason"] = "Hard reset not received from device"
+        raise HTTPException(status_code=status.HTTP_408_REQUEST_TIMEOUT, detail=fail)
+
+    try:
+        update_owner_connection(pot_id=pot_id, new_owner_id=new_user_id)
+    except SystemError as e:
+        fail["reason"] = "Database error during owner change"
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=fail)
+
+    return {
+		"changed": True,
+		"newOwner": get_pot_owner_username(pot_id)
     }

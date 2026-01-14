@@ -68,6 +68,31 @@ def pot_has_owner(pot_id: str) -> str | None:
         conn.close()
 
 
+def get_pot_owner_username(pot_id: str) -> str | None:
+    conn = get_connection()
+    try:
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT u.username
+                    FROM connections c
+                    JOIN users u ON c.user_id = u.user_id
+                    WHERE c.pot_id = %s
+                      AND c.is_owner = TRUE
+                      AND c.is_active = TRUE
+                    LIMIT 1;
+                    """,
+                    (pot_id,)
+                )
+                row = cur.fetchone()
+                if row:
+                    return row["username"]
+                return None
+    finally:
+        conn.close()
+
+
 def insert_connection(pot_id: str, user_id: str, has_owner: bool) -> dict | None:
     conn = get_connection()
 
@@ -294,5 +319,39 @@ def update_config(pot_id: str, data: dict) -> dict | None:
                     },
                 )
                 return cur.fetchone()
+    finally:
+        conn.close()
+
+
+def update_owner_connection(pot_id: str, new_owner_id: str) -> None:
+    conn = get_connection()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE connections
+                    SET is_admin = FALSE, 
+                        is_owner = FALSE
+                    WHERE pot_id = %s;
+                    """,
+                    (pot_id,)
+                )
+
+                cur.execute(
+                    """
+                    INSERT INTO connections (user_id, pot_id, is_active, is_admin, is_owner)
+                    VALUES (%s, %s, TRUE, TRUE, TRUE)
+                    ON CONFLICT (user_id, pot_id)
+                    DO UPDATE SET
+                        is_active = EXCLUDED.is_active,
+                        is_admin  = EXCLUDED.is_admin,
+                        is_owner  = EXCLUDED.is_owner;
+                    """,
+                    (new_owner_id, pot_id)
+                )
+    except Exception:
+        conn.rollback()
+        raise SystemError("Failed to update owner connection transaction")
     finally:
         conn.close()
