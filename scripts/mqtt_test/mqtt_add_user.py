@@ -35,8 +35,8 @@ def main() -> None:
     client.connect(BROKER_HOST, BROKER_PORT, keepalive=60)
 
     payload = {
-        "username": "AABBCCDDEEFF",
-        "password": "device-password",
+        "username": "TEST_POT_ADD",
+        "password": "874f34d952c44d3dae2e1469b10d6468",
     }
 
     publish(client, "users/add", payload)
