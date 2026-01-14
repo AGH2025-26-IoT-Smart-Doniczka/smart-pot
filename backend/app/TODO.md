@@ -7,3 +7,5 @@ Testy:
 - sewer włącza się -> odczytuje wiadomości
 
 retain na /status - w sumie ma sens
+
+env vars - ujednolicenie

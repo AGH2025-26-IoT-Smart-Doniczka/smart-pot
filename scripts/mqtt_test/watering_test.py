@@ -17,8 +17,9 @@ from paho.mqtt import properties as mqtt_properties
 BROKER_HOST = os.environ.get("MQTT_HOST", "localhost")
 BROKER_PORT = int(os.environ.get("MQTT_PORT", "1883"))
 
-DEVICE_UUID = os.environ.get("MQTT_DEVICE_UUID", "TEST_POT_ADD")
-DEVICE_PASSWORD = os.environ.get("MQTT_DEVICE_PASSWORD", "27427f5e3f834b1db8a16bf913e9acdf")
+DEVICE_UUID = os.environ.get("MQTT_DEVICE_UUID", "TEST_POT_ADD_2")
+# DEVICE_PASSWORD = os.environ.get("MQTT_DEVICE_PASSWORD", "27427f5e3f834b1db8a16bf913e9acdf")
+DEVICE_PASSWORD = os.environ.get("MQTT_DEVICE_PASSWORD", "c2ef26da28dd41e9bab2f9e30040df30")
 
 COMMAND_TOPIC = f"devices/{DEVICE_UUID}/watering/cmd"
 STATUS_TOPIC = f"devices/{DEVICE_UUID}/watering/status"
@@ -31,26 +32,25 @@ def publish_status(
     client: mqtt_client.Client,
     connected_event: Event,
     *,
-    stat: str,
-    fin: int,
+    water: int,
 ) -> bool:
     if not connected_event.wait(CONNECT_TIMEOUT):
-        print(f"Publish skipped ({stat}, fin={fin}) - broker offline")
+        print(f"Publish skipped (water={water}) - broker offline")
         return False
 
-    payload = json.dumps({"stat": stat, "fin": fin})
+    payload = json.dumps({"water": water})
     info = client.publish(STATUS_TOPIC, payload, qos=1, retain=False)
     try:
         info.wait_for_publish()
     except RuntimeError as exc:
-        print(f"Publish failed ({stat}, fin={fin}): {exc}")
+        print(f"Publish failed (water={water}): {exc}")
         return False
 
     if info.rc != mqtt_client.MQTT_ERR_SUCCESS:
-        print(f"Publish error ({stat}, fin={fin}) rc={info.rc}")
+        print(f"Publish error (water={water}) rc={info.rc}")
         return False
     else:
-        print(f"Published status ({stat}, fin={fin}) -> rc={info.rc}")
+        print(f"Published status (water={water}) -> rc={info.rc}")
         return True
 
 
@@ -65,16 +65,15 @@ def main() -> None:
 
         print(f"[{reason}] Flushing {len(pending_status)} pending status messages...")
         while pending_status:
-            stat, fin = pending_status[0]
+            water = pending_status[0]
             if publish_status(
                 client,
                 connected_event,
-                stat=stat,
-                fin=fin,
+                water=water
             ):
                 pending_status.popleft()
                 print(
-                    f"[{reason}] Pending status ({stat}, fin={fin}) delivered"
+                    f"[{reason}] Pending status (water={water}) delivered"
                 )
             else:
                 print("Broker still unavailable; keeping pending statuses")
@@ -172,10 +171,9 @@ def main() -> None:
                 if not publish_status(
                     client,
                     connected_event,
-                    stat="Starting",
-                    fin=0,
+                    water=1,
                 ):
-                    pending_status.append(("Starting", 0))
+                    pending_status.append(("Water", 1))
                     print("Queued 'Starting' status for retry")
 
                 for second in range(1, duration + 1):
@@ -185,10 +183,9 @@ def main() -> None:
                 if not publish_status(
                     client,
                     connected_event,
-                    stat="Finished",
-                    fin=1,
+                    water=0,
                 ):
-                    pending_status.append(("Finished", 1))
+                    pending_status.append(("Water", 0))
                     print("Queued 'Finished' status for retry")
                 print("Command finished; ready for next message")
 

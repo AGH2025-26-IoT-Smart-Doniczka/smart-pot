@@ -3,7 +3,11 @@ from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, status
 
-from ..schemas.pots import WaterPlantRequest, PairingRequest, AddUserRequest
+from ..schemas.pots import (
+    WaterPlantRequest, 
+    PairingRequest, 
+    AddUserRequest,
+)
 from ..integrations.mqtt.MQTTClient import MQTTClient
 from ..schemas.mqtt.pots import WaterPlantMqttRequest
 from ..integrations.repositories.pots import (
@@ -117,6 +121,6 @@ def water_status(pot_id: str):
         )
 
     if is_watering:
-        return {"status": "Watering", "finished": False}
+        return {"is_watering": True}
     else:
-        return {"status": "Finished watering", "finished": True}
+        return {"is_watering": False}
