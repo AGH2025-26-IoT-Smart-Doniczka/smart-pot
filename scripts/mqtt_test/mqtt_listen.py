@@ -6,8 +6,8 @@ from paho.mqtt import enums, properties, reasoncodes
 
 BROKER_HOST = os.environ.get("MQTT_HOST", "localhost")
 BROKER_PORT = int(os.environ.get("MQTT_PORT", "1883"))
-USERNAME = os.environ.get("MQTT_USER", "backend")
-PASSWORD = os.environ.get("MQTT_PASSWORD", "backend-password")
+USERNAME = os.environ.get("MQTT_USER", "TEST_POT_ADD")
+PASSWORD = os.environ.get("MQTT_PASSWORD", "70474d24fe464c688066c0d899c27a09")
 
 
 def on_connect(
@@ -21,9 +21,8 @@ def on_connect(
         f"Connected with result code {reason_code.packetType} "
         f"({reason_code.getName()})",
     )
-    client.subscribe("devices/+/telemetry")
-    client.subscribe("devices/+/setup")
-    client.subscribe("devices/+/watering/cmd")
+    client.subscribe("devices/+/telemetry", qos=1)
+    client.subscribe("devices/+/config/cmd", qos=1)
 
 
 def message_callback(
@@ -38,13 +37,15 @@ def message_callback(
 def main() -> None:
     client = mqtt_client.Client(
         callback_api_version=enums.CallbackAPIVersion.VERSION2,
-        client_id="backend",
+        client_id=USERNAME,
         protocol=mqtt_client.MQTTv5,
     )
     client.username_pw_set(USERNAME, PASSWORD)
     client.on_connect = on_connect
     client.on_message = message_callback
-    client.connect(BROKER_HOST, BROKER_PORT, keepalive=60)
+    connect_props = properties.Properties(properties.PacketTypes.CONNECT)
+    connect_props.SessionExpiryInterval = 0xFFFFFFFF
+    client.connect(BROKER_HOST, BROKER_PORT, keepalive=60, clean_start=False, properties=connect_props)
     client.loop_forever()
 
 
