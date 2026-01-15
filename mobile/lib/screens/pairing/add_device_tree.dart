@@ -216,6 +216,7 @@ class _DeviceTreeState extends State<DeviceTree> {
         _isProcessing = false;
       });
     }
+
   }
 
   void _reset() {
