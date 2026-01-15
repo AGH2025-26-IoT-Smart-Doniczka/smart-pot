@@ -3,13 +3,13 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:provider/provider.dart';
+import 'package:smart_pot_mobile_app/data/auth_controller.dart';
+import 'package:smart_pot_mobile_app/data/pots_controller.dart';
 import 'package:smart_pot_mobile_app/screens/pairing/scan_view.dart';
 import 'package:smart_pot_mobile_app/screens/pairing/wifi_form.dart';
+import 'package:smart_pot_mobile_app/services/ble_service.dart';
 
-// różne UUID
-const String SERVICE_UUID = "5c73aa37-a268-40d1-b8d8-7f7a479490a2";
-const String CHARACTERISTICS_PASS_UUID = "456f3c1e-3272-4a0c-9868-cebdd4fc0bee";
-const String CHARACTERISTICS_SSID_UUID = "a3c35f05-51e9-4ad1-9b04-827243129788";
 
 enum PairingStep {
   scanning,
@@ -29,10 +29,6 @@ class DeviceTree extends StatefulWidget {
 class _DeviceTreeState extends State<DeviceTree> {
   PairingStep _step = PairingStep.scanning;
   BluetoothDevice? _connectedDevice;
-
-  // referencja do osobnych characteristics
-  BluetoothCharacteristic? _ssidCharacteristics;
-  BluetoothCharacteristic? _passCharacteristics;
 
   String _errorMessage = "";
   bool _isProcessing = false;
@@ -78,32 +74,6 @@ class _DeviceTreeState extends State<DeviceTree> {
         }
       }
 
-      print("Odkrywanie serwisów");
-      final services = await device.discoverServices();
-
-      BluetoothCharacteristic? ssidChar;
-      BluetoothCharacteristic? passChar;
-
-      for (var service in services) {
-        if (service.uuid.toString() == SERVICE_UUID) {
-          for (var char in service.characteristics) {
-            if (char.uuid.toString() == CHARACTERISTICS_SSID_UUID) {
-              ssidChar = char;
-            }
-            if (char.uuid.toString() == CHARACTERISTICS_PASS_UUID) {
-              passChar = char;
-            }
-          }
-        }
-      }
-
-      if(ssidChar == null || passChar == null){
-        throw Exception("Nie znaleziono charakterystyk konfiguracji Wi-Fi (SSID/PASS)");
-      };
-
-      _ssidCharacteristics = ssidChar;
-      _passCharacteristics = passChar;
-
       setState(() {
         _step = PairingStep.wifiCredentials;
       });
@@ -117,56 +87,83 @@ class _DeviceTreeState extends State<DeviceTree> {
       });
     }
   }
+
+
   Future<void> _sendWifiConfig(String ssid, String pass) async {
     setState(() {
       _isProcessing = true;
     });
 
-    if(isSimulation){
-      print("SYMUALCJA: Wysyłąm SSID: $ssid");
-      print("SYMULACJA: Wysyłam PASS: $pass");
-      await Future.delayed(const Duration(seconds: 2));
-      setState(() {
-        _step = PairingStep.success;
-        _isProcessing = false;
-      });
-    }
+    try{
+      if(_connectedDevice == null && isSimulation == false){
+        throw Exception("Utracono połączenie z urządzeniem BLE");
+      }
+
+      final currentUser = context.read<AuthController>().currentUser;
+      if(currentUser == null) throw Exception("Użytkownik nie jest zalogowany. ");
+
+      final potId = isSimulation ? "Sim-Pot-001" : _connectedDevice!.remoteId.str;
+
+      Map<String, dynamic> pairingData;
+      if(!isSimulation){
+        pairingData = await context.read<PotsController>().pairPotWithServer(potId);
+      }else {
+        pairingData = {
+          "role": "owner",
+          "mqtt":{
+            "username": "TEST_MQTT_USER",
+            "password": "TEST_MQTT_PASS"
+          }
+        };
+      }
+
+      final String role = pairingData['role'] ?? 'user';
+      final Map<String, dynamic> mqttData = pairingData['mqtt'] ?? {};
+
+      final String mqttUser = mqttData['username'] ?? '';
+      final String mqttPass = mqttData['password'] ?? '';
+
+      final bool isOwner = role == 'owner';
+      
+      print("Status właściciela: ${isOwner}");
+
+      if(!isSimulation){
+
+        if(_connectedDevice!.isConnected == false){
+          await _connectedDevice!.connect(license: License.free);
+        }
+
+        await BleService().writeConfiguration(
+            device: _connectedDevice!,
+            ssid: ssid,
+            wifiPass: pass,
+            userId: currentUser.id,
+            mqttPass: mqttPass,
+            mqttUser: mqttUser
+        );
+
+        await _connectedDevice!.disconnect();
+      }else{
+        await Future.delayed(const Duration(seconds: 2));
+      }
+
+      if(mounted){
+        context.read<PotsController>().fetchPots(); // odświeżanie listy doniczek
+        setState(() {
+          _isProcessing = false;
+          _step = PairingStep.success;
+        });
+      }
 
 
-    if (_ssidCharacteristics == null || _passCharacteristics == null) {
+    }catch(e){
       setState(() {
-        _errorMessage = "Utracono połączenie z usługami urządzenia";
+        _errorMessage = "Wystąpił błąd: $e";
         _step = PairingStep.failure;
-      });
-      return;
-    }
-
-    try {
-      // Wysyłanie SSID
-      print("Wysyłanie SSID...");
-      await _ssidCharacteristics!.write(utf8.encode(ssid));
-
-      // opóźnienie podobno potrzebne dla BLE stacka XD
-      await Future.delayed(const Duration(milliseconds: 300));
-
-      //Wysłanie PASS
-      print("Wysyłanie Hasła...");
-      await _passCharacteristics!.write(utf8.encode(pass));
-
-      setState(() {
-        _step = PairingStep.success;
-      });
-
-    } catch (e) {
-      setState(() {
-        _errorMessage = "Błąd podczas wysyłania danych: $e";
         _isProcessing = false;
-        // bez wchodzenia do failure żeby user spróbować ponownie
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Błąd: $e")));
     }
+
   }
 
   void _reset() {
@@ -174,8 +171,6 @@ class _DeviceTreeState extends State<DeviceTree> {
     setState(() {
       _step = PairingStep.scanning;
       _connectedDevice = null;
-      _ssidCharacteristics = null;
-      _passCharacteristics = null;
       _errorMessage = "";
       _isProcessing = false;
     });
