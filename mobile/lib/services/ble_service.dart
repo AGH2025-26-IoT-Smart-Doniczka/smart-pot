@@ -52,6 +52,9 @@ class BleService {
     return (potId: potId, isHardReset: isHardReset);
   }
 
+  //config
+  static const String CHARACTERISTICS_CONFIG_UUID = '2934e2ce-26f9-4705-bd1d-dfb343f63d04';
+
   Future<void> writeConfiguration({
     required BleDevice device,
     String? ssid,
@@ -76,6 +79,7 @@ class BleService {
           utf8.encode(wifiPass),
         );
       }
+    }
 
       if (sendConfig) {
         List<int> configBytes;
@@ -102,6 +106,33 @@ class BleService {
     } catch (e) {
       throw Exception('Błąd zapisu konfiguracji: $e');
     }
+    print("Wpisywanie configu");
+    final config = _generateDefaultConfig();
+    await writeBytes(CHARACTERISTICS_CONFIG_UUID, config);
+  }
+
+  // metoda wypisująca config "na sztywno"
+  List<int> _generateDefaultConfig(){
+    int tempLow = 2880;   //15 stopni
+    int tempHigh = 3032; //30 stopni
+    int sleepSec = 60;
+
+    return [
+      1, //srednie naswietlenie BYTE 0
+      20, // 1 prog wigotnosci (20%) BYTE 1
+      40, // 2 prog wilgotnosci (40%) BYTE 2
+      60, // 3 prog wilgotnosci (60%) BYTE 3
+      80, // 4 prog wilgotnosci (80%) BYTE 4
+
+      // Byte 5-6: Temp Low (Little Endian)
+      tempLow & 0xFF, (tempLow >> 8) & 0xFF,
+
+      // Byte 7-8: Temp High (Little Endian)
+      tempHigh & 0xFF, (tempHigh >> 8) & 0xFF,
+
+      // Byte 9-10: Sleep duration (Little Endian)
+      sleepSec & 0xFF, (sleepSec >> 8) & 0xFF,
+    ];
   }
 
   Future<bool> isPotConnected(String potId) async {
