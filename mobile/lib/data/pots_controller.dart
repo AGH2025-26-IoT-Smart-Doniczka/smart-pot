@@ -22,11 +22,11 @@ class PotsController extends ChangeNotifier {
 
   PotsController(this._authController);
 
-  Future<void> fetchPots() async{
+  Future<void> fetchPots() async {
     print("Fetching pots...");
 
     final user = _authController.currentUser;
-    if(user == null){
+    if (user == null) {
       _error = "Użytkownik nie jest zalogowany";
       _pots = [];
       notifyListeners();
@@ -37,9 +37,9 @@ class PotsController extends ChangeNotifier {
     _error = null;
     notifyListeners();
 
-    try{
+    try {
       final response = await http.get(Uri.parse(_baseUrl));
-      if(response.statusCode != 200){
+      if (response.statusCode != 200) {
         _error = "Błąd pobierania danych doniczek: ${response.statusCode}";
         return;
       }
@@ -57,28 +57,43 @@ class PotsController extends ChangeNotifier {
 
       // Mapujemy JSON na obiekty Pot
       _pots = userPotsJson.map((json) => Pot.fromJson(json)).toList();
-
-    }catch(e){
-        _error = "Błąd pobierania danych doniczek: $e";
-        _pots = [];
-    }finally{
+    } catch (e) {
+      _error = "Błąd pobierania danych doniczek: $e";
+      _pots = [];
+    } finally {
       _isLoading = false;
       notifyListeners();
     }
-
-    // try {
-    //   await Future.delayed(const Duration(seconds: 1));
-    //
-    //   final userPotsJson = _mockPots.where((pot) => pot['userPublicKey'] == user.id).toList();
-    //
-    //   _pots = userPotsJson.map((json) => Pot.fromJson(json)).toList();
-    // }catch (e){
-    //   _error = "Błąd pobierania danych doniczek: $e";
-    // } finally{
-    //   _isLoading = false;
-    //   notifyListeners();
-    // }
   }
 
-  // TODO: zrób metode, która dodaje nową doniczkę
+  Future<Map<String, dynamic>> pairPotWithServer(String potId) async {
+    final user = _authController.currentUser;
+    if (user == null) {
+      throw new Exception("Użytkownik nie jest zalogowany");
+    }
+
+    final url = Uri.parse('$_baseUrl/pots/${potId}/pairing');
+
+    try{
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${user.token}'
+        },
+        body: json.encode({
+          "user_id": user.id,
+        }),
+      );
+
+      if(response.statusCode == 201 || response.statusCode == 200){
+        return json.decode(response.body);
+      }else{
+        final errorData = json.decode(response.body);
+        throw Exception(errorData['detail'] ?? 'Błąd parowania: ${response.statusCode}');
+      }
+    }catch(e){
+      throw Exception("Błąd połączenia z serwerem: $e");
+    }
+  }
 }
