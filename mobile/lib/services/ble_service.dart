@@ -52,8 +52,9 @@ class BleService {
     return (potId: potId, isHardReset: isHardReset);
   }
 
-  //config
-  static const String CHARACTERISTICS_CONFIG_UUID = '2934e2ce-26f9-4705-bd1d-dfb343f63d04';
+  // config characteristic
+  static const String CHARACTERISTICS_CONFIG_UUID =
+      '043df643-b3df-1dbd-0547-f926cee23429'; //
 
   Future<void> writeConfiguration({
     required BleDevice device,
@@ -106,14 +107,16 @@ class BleService {
     } catch (e) {
       throw Exception('Błąd zapisu konfiguracji: $e');
     }
+
     print("Wpisywanie configu");
     final config = _generateDefaultConfig();
+    print("Config bytes: $config");
     await writeBytes(CHARACTERISTICS_CONFIG_UUID, config);
   }
 
   // metoda wypisująca config "na sztywno"
-  List<int> _generateDefaultConfig(){
-    int tempLow = 2880;   //15 stopni
+  List<int> _generateDefaultConfig() {
+    int tempLow = 2880; //15 stopni
     int tempHigh = 3032; //30 stopni
     int sleepSec = 60;
 
@@ -123,7 +126,7 @@ class BleService {
       40, // 2 prog wilgotnosci (40%) BYTE 2
       60, // 3 prog wilgotnosci (60%) BYTE 3
       80, // 4 prog wilgotnosci (80%) BYTE 4
-
+      0, //buffer
       // Byte 5-6: Temp Low (Little Endian)
       tempLow & 0xFF, (tempLow >> 8) & 0xFF,
 
