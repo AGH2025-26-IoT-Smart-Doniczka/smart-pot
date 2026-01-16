@@ -118,7 +118,9 @@ def list_user_pots(authorization: str | None = Header(default=None)):
                 **pot,
                 "is_active": pot.get("is_active", True),
                 "config": {
-                    "pot_name": cfg.get("pot_name") or pot.get("name") or pot.get("pot_id"),
+                    "pot_name": cfg.get("pot_name")
+                    or pot.get("name")
+                    or pot.get("pot_id"),
                     "measure_interval_sec": cfg.get("measure_interval_sec") or 0,
                     "send_interval_sec": cfg.get("send_interval_sec") or 0,
                     "watering_interval_sec": cfg.get("watering_interval_sec"),
