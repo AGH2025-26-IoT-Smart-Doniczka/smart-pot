@@ -2,7 +2,7 @@ import os
 from decimal import Decimal
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, status, Query
+from fastapi import APIRouter, HTTPException, status, Query, JSONResponse
 
 from ..schemas.pots import (
     WaterPlantRequest, 
@@ -12,8 +12,7 @@ from ..schemas.pots import (
 )
 from ..integrations.mqtt.MQTTClient import MQTTClient
 from ..schemas.mqtt.pots import (
-    WaterPlantMqttRequest,
-    AddUserRequest
+    WaterPlantMqttRequest
 )
 from ..integrations.repositories.pots import (
     get_watering_status,
@@ -27,6 +26,7 @@ from ..integrations.repositories.pots import (
     update_owner_connection
 )
 from ..domain.hard_reset_handler import wait_for_hard_reset
+from ..utils.mqtt_password import get_new_mqtt_password
 
 router = APIRouter()
 
@@ -45,11 +45,12 @@ def json_safe(obj):
 @router.post("/{pot_id}/pairing", status_code=status.HTTP_201_CREATED)
 def pair_plant_with_user(pot_id: str, data: PairingRequest):
     has_owner = pot_has_owner(pot_id)
+    mqtt_password = get_new_mqtt_password()
     result = {
             "role": "owner",
             "mqtt": {
                 "username": pot_id,
-                "password": ""
+                "password": mqtt_password
             }
     }
     print(f"Pot {pot_id} has owner: {has_owner}")
@@ -65,30 +66,12 @@ def pair_plant_with_user(pot_id: str, data: PairingRequest):
         )
 
     if has_owner is not None:
+        result["mqtt"]["password"] = ""
         result["role"] = "user"
-        return result
+        return JSONResponse(result, status_code=status.HTTP_200_OK)
     
-    mqtt_password = uuid4().hex
-    client_id = f"backend-pairing-{uuid4().hex[:8]}"
-
-    mqqt_client = MQTTClient(client_id=client_id, persistent_session=False)
-    mqqt_client.connect()
-
-    try:
-        topic = "users/add"
-        payload = AddUserRequest(
-            username=pot_id,
-            password=mqtt_password
-        ).model_dump()
-        print(f"Publishing to topic {topic} payload {payload}")
-
-        mqqt_client.publish(topic, payload, qos=1, retain=False)
-
-    finally:
-        mqqt_client.disconnect()
-
     result["mqtt"]["password"] = mqtt_password
-    return result
+    return JSONResponse(result, status_code=status.HTTP_200_OK)
 
 
 @router.get("/{pot_id}/measures")
@@ -122,19 +105,19 @@ def water_plant(pot_id: str, data: WaterPlantRequest):
         )
 
     client_id = f"backend-water-{uuid4().hex[:8]}"
-    mqqt_client = MQTTClient(client_id=client_id, persistent_session=False)
-    mqqt_client.connect()
+    mqtt_client = MQTTClient(client_id=client_id, persistent_session=False)
+    mqtt_client.connect()
 
     try:
         topic = f"devices/{pot_id}/watering/cmd"
         payload = WaterPlantMqttRequest(dur=data.duration).model_dump()
-        mqqt_client.publish(
+        mqtt_client.publish(
             topic,
             payload,
             qos=1,
         )
     finally:
-        mqqt_client.disconnect()
+        mqtt_client.disconnect()
 
     return {"message": "Watering queued"}
 

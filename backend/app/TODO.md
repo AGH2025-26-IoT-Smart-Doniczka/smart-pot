@@ -6,6 +6,8 @@ Testy:
 - serwer wyłącza się -> esp kolejkuje wiadomości 
 - sewer włącza się -> odczytuje wiadomości
 
+Dodac mqtt hasło do bazy w razie utraty
+
 retain na /status - w sumie ma sens
 
 dodanie autentyfikacji z jwt do actions uzytkownika
