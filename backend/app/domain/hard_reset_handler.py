@@ -1,3 +1,4 @@
+import logging
 import time
 from queue import Empty, Queue
 from threading import Lock
@@ -6,6 +7,7 @@ from typing import Dict
 
 hard_reset_queues: Dict[str, Queue[dict]] = {}
 hard_reset_lock = Lock()
+logger = logging.getLogger(__name__)
 
 
 def _get_queue(pot_id: str) -> Queue[dict]:
@@ -28,6 +30,7 @@ def _drain_queue(queue: Queue[dict]) -> None:
 def hard_reset_handler(topic: str, payload: dict):
     pot_id = topic.split("/")[1]
     queue = _get_queue(pot_id)
+    logger.info("hard reset received", extra={"pot_id": pot_id, "topic": topic, "payload": payload})
     queue.put({"pot_id": pot_id, "timestamp": payload.get("timestamp")})
 
 

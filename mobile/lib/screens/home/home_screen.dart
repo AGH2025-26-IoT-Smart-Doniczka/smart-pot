@@ -18,9 +18,9 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     // TODO: implement initState
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<PotsController>().fetchPots();
-    });
+    // WidgetsBinding.instance.addPostFrameCallback((_) {
+    //   context.read<PotsController>().fetchPots();
+    // });
   }
 
   @override
@@ -52,7 +52,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       return Center(child: CircularProgressIndicator());
                     }
                     if (ctrl.pots.isEmpty) {
-                      return const Center(child: Text("Brak doniczek. Dodaj pierwszą!"));
+                      return const Center(
+                        child: Text("Brak doniczek. Dodaj pierwszą!"),
+                      );
                     }
                     return ListView.builder(
                       scrollDirection: Axis.horizontal,
@@ -65,8 +67,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           // TODO: trzeba jeszcze określić co to ma wyświetlać
                           child: PotMiniCard(
-                            statusEmoji: pot.data.soilMoisture < 30 ? '⚠️' : '😊',
-                            description: "Temp: ${pot.data.airTemp.toStringAsFixed(1)}°C",
+                            statusEmoji: pot.data.soilMoisture < 30
+                                ? '⚠️'
+                                : '😊',
+                            description:
+                                "Temp: ${pot.data.airTemp.toStringAsFixed(1)}°C",
                             title: pot.potId ?? 'Pot',
                             imageUrl: "assets/images/test_pot.png",
                           ),

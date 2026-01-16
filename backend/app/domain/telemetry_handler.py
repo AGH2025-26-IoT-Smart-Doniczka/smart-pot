@@ -1,6 +1,8 @@
+import json
+import logging
 from queue import Queue
 from typing import Any, Tuple
-import json
+
 from pydantic import ValidationError
 
 from app.schemas.mqtt.pots import (
@@ -11,10 +13,13 @@ from app.integrations.repositories.pots import measures_insert
 
 TelemetryEvent = Tuple[str, Any]
 
+logger = logging.getLogger(__name__)
+
 telemetry_queue: Queue[TelemetryEvent] = Queue()
 
 
 def telemetry_handler(topic: str, payload: dict) -> None:
+    logger.info("ingress telemetry enqueued", extra={"topic": topic})
     telemetry_queue.put((topic, payload))
 
 def _normalize_payload(payload: Any) -> dict:
@@ -37,21 +42,28 @@ def telemetry_worker() -> None:
         try:
             raw_payload = _normalize_payload(payload)
         except (json.JSONDecodeError, UnicodeDecodeError, TypeError) as exc:
-            print(f"Invalid telemetry payload on {topic}: {exc}")
+            logger.warning("invalid telemetry payload", extra={"topic": topic, "error": str(exc)})
             continue
 
         try:
             data = TelemetryMqttMessage(**raw_payload)
         except ValidationError as e:
-            print("Validation error", e)
+            logger.warning("telemetry validation error", extra={"topic": topic, "error": str(e)})
             continue
-        else:
-            print("unix timestamp:", data.timestamp)
-            print("Lux:", data.data.lux)
+
+        logger.info(
+            "telemetry parsed",
+            extra={
+                "topic": topic,
+                "timestamp": data.timestamp,
+                "lux": data.data.lux,
+                "moi": data.data.moi,
+                "tem": data.data.tem,
+                "pre": data.data.pre,
+            },
+        )
 
         pot_id = topic.split("/")[1]
-        print("Pot ID:", pot_id)
-
         try:
             measures_insert(
                 pot_id=pot_id,
@@ -62,4 +74,6 @@ def telemetry_worker() -> None:
                 illuminance=data.data.lux
             )
         except Exception as e:
-            print(f"Error inserting telemetry data for pot {pot_id}: {e}")
+            logger.error("telemetry insert failed", extra={"pot_id": pot_id, "error": str(e)})
+        else:
+            logger.info("telemetry stored", extra={"pot_id": pot_id})
