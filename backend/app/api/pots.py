@@ -28,6 +28,7 @@ from ..integrations.repositories.pots import (
 )
 from ..domain.hard_reset_handler import wait_for_hard_reset
 from ..utils.jwt_token import decode_access_token
+from ..utils.mqtt_password import get_new_mqtt_password
 
 router = APIRouter()
 
@@ -95,7 +96,9 @@ def list_user_pots(authorization: str | None = Header(default=None)):
             {
                 **pot,
                 "config": {
-                    "pot_name": cfg.get("pot_name") or pot.get("name") or pot.get("pot_id"),
+                    "pot_name": cfg.get("pot_name")
+                    or pot.get("name")
+                    or pot.get("pot_id"),
                     "measure_interval_sec": cfg.get("measure_interval_sec") or 0,
                     "send_interval_sec": cfg.get("send_interval_sec") or 0,
                     "watering_interval_sec": cfg.get("watering_interval_sec"),
@@ -107,7 +110,9 @@ def list_user_pots(authorization: str | None = Header(default=None)):
                         "opt_max": humidity.get("high") or 0,
                         "max": humidity.get("very_high") or 0,
                     },
-                    "illuminance": ILLUMINANCE_REVERSE.get(cfg.get("illuminance"), "medium"),
+                    "illuminance": ILLUMINANCE_REVERSE.get(
+                        cfg.get("illuminance"), "medium"
+                    ),
                 },
             }
         )
@@ -119,7 +124,8 @@ def list_user_pots(authorization: str | None = Header(default=None)):
 @router.post("/{pot_id}/pairing", status_code=status.HTTP_201_CREATED)
 def pair_plant_with_user(pot_id: str, data: PairingRequest):
     has_owner = pot_has_owner(pot_id)
-    result = {"role": "owner", "mqtt": {"username": pot_id, "password": ""}}
+    mqtt_password = get_new_mqtt_password()
+    result = {"role": "owner", "mqtt": {"username": pot_id, "password": mqtt_password}}
     print(f"Pot {pot_id} has owner: {has_owner}")
     if has_owner is not None and has_owner[0] == data.user_id:
         return result
@@ -130,27 +136,12 @@ def pair_plant_with_user(pot_id: str, data: PairingRequest):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ve))
 
     if has_owner is not None:
+        result["mqtt"]["password"] = ""
         result["role"] = "user"
-        return result
-
-    mqtt_password = uuid4().hex
-    client_id = f"backend-pairing-{uuid4().hex[:8]}"
-
-    mqqt_client = MQTTClient(client_id=client_id, persistent_session=False)
-    mqqt_client.connect()
-
-    try:
-        topic = "users/add"
-        payload = AddUserRequest(username=pot_id, password=mqtt_password).model_dump()
-        print(f"Publishing to topic {topic} payload {payload}")
-
-        mqqt_client.publish(topic, payload, qos=1, retain=False)
-
-    finally:
-        mqqt_client.disconnect()
+        return JSONResponse(result, status_code=status.HTTP_200_OK)
 
     result["mqtt"]["password"] = mqtt_password
-    return result
+    return JSONResponse(result, status_code=status.HTTP_200_OK)
 
 
 @router.get("/{pot_id}/measures")
@@ -177,19 +168,19 @@ def water_plant(pot_id: str, data: WaterPlantRequest):
         )
 
     client_id = f"backend-water-{uuid4().hex[:8]}"
-    mqqt_client = MQTTClient(client_id=client_id, persistent_session=False)
-    mqqt_client.connect()
+    mqtt_client = MQTTClient(client_id=client_id, persistent_session=False)
+    mqtt_client.connect()
 
     try:
         topic = f"devices/{pot_id}/watering/cmd"
         payload = WaterPlantMqttRequest(dur=data.duration).model_dump()
-        mqqt_client.publish(
+        mqtt_client.publish(
             topic,
             payload,
             qos=1,
         )
     finally:
-        mqqt_client.disconnect()
+        mqtt_client.disconnect()
 
     return {"message": "Watering queued"}
 
