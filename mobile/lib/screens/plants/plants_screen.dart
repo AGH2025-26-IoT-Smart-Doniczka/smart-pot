@@ -22,8 +22,8 @@ class MyPotsScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => context.read<PotsController>().fetchPots(),
-          )
+            onPressed: () => {}, //context.read<PotsController>().fetchPots(),
+          ),
         ],
       ),
       body: Builder(
@@ -42,12 +42,12 @@ class MyPotsScreen extends StatelessWidget {
                   const Text('Nie masz jeszcze żadnych roślin.'),
                   const SizedBox(height: 10),
                   ElevatedButton(
-                      onPressed: () {
-                        // Tutaj w przyszłości nawigacja do parowania
-                        Navigator.pushNamed(context, '/scan');
-                      },
-                      child: const Text("Dodaj doniczkę")
-                  )
+                    onPressed: () {
+                      // Tutaj w przyszłości nawigacja do parowania
+                      Navigator.pushNamed(context, '/scan');
+                    },
+                    child: const Text("Dodaj doniczkę"),
+                  ),
                 ],
               ),
             );
@@ -67,4 +67,3 @@ class MyPotsScreen extends StatelessWidget {
     );
   }
 }
-

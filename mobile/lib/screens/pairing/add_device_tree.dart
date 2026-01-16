@@ -4,20 +4,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:smart_pot_mobile_app/data/auth_controller.dart';
 import 'package:smart_pot_mobile_app/data/pots_controller.dart';
 import 'package:smart_pot_mobile_app/screens/pairing/scan_view.dart';
 import 'package:smart_pot_mobile_app/screens/pairing/wifi_form.dart';
 import 'package:smart_pot_mobile_app/services/ble_service.dart';
 
-
-enum PairingStep {
-  scanning,
-  connecting,
-  wifiCredentials,
-  success,
-  failure,
-}
+enum PairingStep { scanning, connecting, wifiCredentials, success, failure }
 
 class DeviceTree extends StatefulWidget {
   const DeviceTree({super.key});
@@ -62,14 +56,14 @@ class _DeviceTreeState extends State<DeviceTree> {
       _connectedDevice = device;
 
       // Parowanie (bounding)
-      if(device.bondState != BluetoothBondState.bonded){
-        try{
+      if (device.bondState != BluetoothBondState.bonded) {
+        try {
           print("Parowanie rozpoczęte");
           await device.createBond();
 
           // czekamy na wyświetlenie okienka i wpisanie pinu prezz użytkownika
           await Future.delayed(const Duration(seconds: 3));
-        }catch (e){
+        } catch (e) {
           print("Ostrzeżenie przy parowaniu: $e");
         }
       }
@@ -77,7 +71,6 @@ class _DeviceTreeState extends State<DeviceTree> {
       setState(() {
         _step = PairingStep.wifiCredentials;
       });
-
     } catch (e) {
       print("Błąd połączenia: $e");
       await device.disconnect();
@@ -88,82 +81,104 @@ class _DeviceTreeState extends State<DeviceTree> {
     }
   }
 
-
   Future<void> _sendWifiConfig(String ssid, String pass) async {
     setState(() {
       _isProcessing = true;
     });
 
-    try{
-      if(_connectedDevice == null && isSimulation == false){
+    try {
+      if (_connectedDevice == null && isSimulation == false) {
         throw Exception("Utracono połączenie z urządzeniem BLE");
       }
 
       final currentUser = context.read<AuthController>().currentUser;
-      if(currentUser == null) throw Exception("Użytkownik nie jest zalogowany. ");
+      if (currentUser == null)
+        throw Exception("Użytkownik nie jest zalogowany. ");
 
-      final potId = isSimulation ? "Sim-Pot-001" : _connectedDevice!.remoteId.str;
+      final potId = isSimulation
+          ? "Sim-Pot-001"
+          : _connectedDevice!.remoteId.str.replaceAll(':', '');
+      print(_connectedDevice!.remoteId.str);
+      print(potId);
 
       Map<String, dynamic> pairingData;
-      if(!isSimulation){
-        pairingData = await context.read<PotsController>().pairPotWithServer(potId);
-      }else {
+      if (!isSimulation) {
+        pairingData = await context.read<PotsController>().pairPotWithServer(
+          potId,
+        );
+      } else {
         pairingData = {
           "role": "owner",
-          "mqtt":{
-            "username": "TEST_MQTT_USER",
-            "password": "TEST_MQTT_PASS"
-          }
+          "mqtt": {"username": "TEST_MQTT_USER", "password": "TEST_MQTT_PASS"},
         };
       }
-
+      print(pairingData);
       final String role = pairingData['role'] ?? 'user';
       final Map<String, dynamic> mqttData = pairingData['mqtt'] ?? {};
 
-      final String mqttUser = mqttData['username'] ?? '';
-      final String mqttPass = mqttData['password'] ?? '';
+      String mqttUser = mqttData['username'] ?? '';
+      String mqttPass = mqttData['password'] ?? '';
+
+      // If backend did not return MQTT credentials, try previously stored ones.
+      if (mqttPass.isEmpty) {
+        const storage = FlutterSecureStorage();
+        final storedPass = await storage.read(key: 'mqtt_password');
+        final storedUser = await storage.read(key: 'mqtt_username');
+        if (storedPass != null && storedPass.isNotEmpty) {
+          mqttPass = storedPass;
+          if (storedUser != null && storedUser.isNotEmpty) {
+            mqttUser = storedUser;
+          }
+        }
+      }
 
       final bool isOwner = role == 'owner';
-      
+
       print("Status właściciela: ${isOwner}");
 
-      if(!isSimulation){
-
-        if(_connectedDevice!.isConnected == false){
+      if (!isSimulation) {
+        if (_connectedDevice!.isConnected == false) {
           await _connectedDevice!.connect(license: License.free);
         }
 
+        // Persist freshly issued MQTT credentials for later use
+        if (mqttPass.isNotEmpty) {
+          const storage = FlutterSecureStorage();
+          await storage.write(key: 'mqtt_password', value: mqttPass);
+          if (mqttUser.isNotEmpty) {
+            await storage.write(key: 'mqtt_username', value: mqttUser);
+          }
+        }
+
         await BleService().writeConfiguration(
-            device: _connectedDevice!,
-            ssid: ssid,
-            wifiPass: pass,
-            userId: currentUser.id,
-            mqttPass: mqttPass,
-            mqttUser: mqttUser
+          device: _connectedDevice!,
+          ssid: ssid,
+          wifiPass: pass,
+          mqttPass: mqttPass,
+          mqttUser: mqttUser,
         );
 
         await _connectedDevice!.disconnect();
-      }else{
+      } else {
         await Future.delayed(const Duration(seconds: 2));
       }
 
-      if(mounted){
-        context.read<PotsController>().fetchPots(); // odświeżanie listy doniczek
-        setState(() {
-          _isProcessing = false;
-          _step = PairingStep.success;
-        });
-      }
-
-
-    }catch(e){
+      // if (mounted) {
+      //   context
+      //       .read<PotsController>()
+      //       // .fetchPots(); // odświeżanie listy doniczek
+      //   setState(() {
+      //     _isProcessing = false;
+      //     _step = PairingStep.success;
+      //   });
+      // }
+    } catch (e) {
       setState(() {
         _errorMessage = "Wystąpił błąd: $e";
         _step = PairingStep.failure;
         _isProcessing = false;
       });
     }
-
   }
 
   void _reset() {
@@ -205,11 +220,14 @@ class _DeviceTreeState extends State<DeviceTree> {
               SizedBox(height: 20),
               Text("Łączenie i parowanie..."),
               SizedBox(height: 20),
-              Text("Jeśli pojawi się systemowe okienko parowanie, \nwpisz kod z urządzenia", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey),),
+              Text(
+                "Jeśli pojawi się systemowe okienko parowanie, \nwpisz kod z urządzenia",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey),
+              ),
             ],
           ),
         );
-
 
       case PairingStep.wifiCredentials:
         return WifiForm(onSubmit: _sendWifiConfig, isSending: _isProcessing);
