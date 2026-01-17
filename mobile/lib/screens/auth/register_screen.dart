@@ -84,7 +84,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           );
                           return;
                         }
-                        ;
                         if (pass != confirmPass) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
