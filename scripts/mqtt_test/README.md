@@ -1,8 +1,8 @@
 # mqtt_test
 
-This directory contains test scripts for MQTT server.
+This directory contains test scripts for the MQTT server.
 
-## Prepare venv
+## Prepare the venv
 
 ```bash
 $ uv sync --frozen
@@ -20,4 +20,10 @@ uv run python -m mqtt_publish
 
 ```bash
 uv run python -m mqtt_listen
+```
+
+## Adding a user
+
+```bash
+uv run python -m mqtt_add_user
 ```

@@ -1,10 +1,18 @@
 services:
   mosquitto:
-    image: eclipse-mosquitto:2
+    build: ./mosquitto
     container_name: smart-pot-mosquitto
     restart: unless-stopped
     ports:
       - "1883:1883"
+    environment:
+      MQTT_HOST: "localhost"
+      MQTT_PORT: "1883"
+      AGENT_LOGIN: "mqtt-agent"
+      AGENT_PASSWORD: "mqtt-agent-password"
+      ACL_PATH: "/mosquitto/config/acl"
+      PASSWD_PATH: "/mosquitto/config/dev_passwd"
+      CONTROL_TOPIC: "users/add"
     volumes:
       - ./mosquitto/config:/mosquitto/config
       - ./mosquitto/data:/mosquitto/data
