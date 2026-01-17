@@ -44,7 +44,9 @@ def main() -> None:
     client.username_pw_set(USERNAME, PASSWORD)
     client.on_connect = on_connect
     client.on_message = message_callback
-    client.connect(BROKER_HOST, BROKER_PORT, keepalive=60)
+    connect_props = properties.Properties(properties.PacketTypes.CONNECT)
+    connect_props.SessionExpiryInterval = 0xFFFFFFFF
+    client.connect(BROKER_HOST, BROKER_PORT, keepalive=60, clean_start=False, properties=connect_props)
     client.loop_forever()
 
 

@@ -6,9 +6,10 @@
 docker-compose up mosquitto
 ```
 
-This launches the MQTT server with exposed port `1883`.
+This launches the MQTT server with exposed port `1883` and starts the agent
+inside the same container.
 
-There are two development accounts in configuration files:
+There are three development accounts in the configuration files:
 
 - Device
   - Login: `AABBCCDDEEFF`
@@ -16,6 +17,9 @@ There are two development accounts in configuration files:
 - Backend
   - Login: `backend`
   - Password: `backend-password`
+- MQTT Agent (for dynamic user creation)
+  - Login: `mqtt-agent`
+  - Password: `mqtt-agent-password`
 
 ## Adding password manually
 
@@ -23,8 +27,21 @@ There are two development accounts in configuration files:
 mosquitto_passwd -b ./mosquitto/config/dev_passwd <login> <password>
 ```
 
-This command will add new user into the `./config/dev_passwd` file.
+This command will add a new user to the `./config/dev_passwd` file.
 
 > [!NOTE]
-> `<login>` should be equal to normalized MAC address.  
+> `<login>` should be equal to the normalized MAC address.  
 > Example: `AA:BB:CC:DD:EE:FF` = `AABBCCDDEEFF`
+
+## Adding user dynamically
+
+Send the payload below to topic `users/add`
+
+```json
+{
+    "username": "<login>",
+    "password": "<password>"
+}
+```
+
+This will also add a new user to the `./config/dev_passwd` file.
