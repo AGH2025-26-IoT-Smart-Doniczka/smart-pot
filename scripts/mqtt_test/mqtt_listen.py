@@ -21,9 +21,8 @@ def on_connect(
         f"Connected with result code {reason_code.packetType} "
         f"({reason_code.getName()})",
     )
-    client.subscribe("devices/+/telemetry")
-    client.subscribe("devices/+/setup")
-    client.subscribe("devices/+/watering/cmd")
+    client.subscribe("devices/+/telemetry", qos=1)
+    client.subscribe("devices/+/setup", qos=1)
 
 
 def message_callback(
