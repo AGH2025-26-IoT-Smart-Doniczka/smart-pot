@@ -1,11 +1,7 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_pot_mobile_app/data/pots_controller.dart';
 import 'package:smart_pot_mobile_app/models/pot_data.dart';
-import 'package:smart_pot_mobile_app/theme/theme_controller.dart';
 import 'package:smart_pot_mobile_app/widgets/pot_card.dart';
 
 class MyPotsScreen extends StatelessWidget {

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_pot_mobile_app/data/pots_controller.dart';
-import 'package:smart_pot_mobile_app/theme/theme_controller.dart';
 import 'package:smart_pot_mobile_app/widgets/alerts_container.dart';
 import 'package:smart_pot_mobile_app/widgets/pot_card.dart';
 
@@ -27,8 +26,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Consumer<PotsController>(
       builder: (context, ctrl, child) {
+        const double floatingButtonZoneHeight = 120;
+        final double bottomPadding =
+            floatingButtonZoneHeight +
+            MediaQuery.of(context).padding.bottom +
+            16;
         return SingleChildScrollView(
-          padding: EdgeInsets.all(16),
+          padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -72,7 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 : '😊',
                             description:
                                 "Temp: ${pot.data.airTemp.toStringAsFixed(1)}°C",
-                            title: pot.potId ?? 'Pot',
+                            title: pot.potId,
                             imageUrl: "assets/images/test_pot.png",
                           ),
                         );
@@ -85,6 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Text("Alerty", style: Theme.of(context).textTheme.headlineSmall),
               SizedBox(height: 20),
               AlertsContainer(),
+              SizedBox(height: floatingButtonZoneHeight),
             ],
           ),
         );

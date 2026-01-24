@@ -17,10 +17,8 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeController>();
-    final titles = ['Home', 'Collection'];
     return Scaffold(
       appBar: AppBar(
-        title: Text(titles[_index]),
         centerTitle: true,
         elevation: 2.0,
         //ikony po prawej
@@ -49,10 +47,9 @@ class _MainShellState extends State<MainShell> {
       body: IndexedStack(
         index: _index,
         children: [
-          HomeScreen(
-            onShowPlants: () => setState(() => _index=1),
-          ),
-          const MyPotsScreen()],
+          HomeScreen(onShowPlants: () => setState(() => _index = 1)),
+          const MyPotsScreen(),
+        ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
@@ -60,33 +57,33 @@ class _MainShellState extends State<MainShell> {
         destinations: [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
-            label: "Home",
+            label: "Dom",
             selectedIcon: Icon(Icons.home),
           ),
           NavigationDestination(
             icon: Icon(Icons.local_florist_outlined),
-            label: "Plants",
+            label: "Rośliny",
             selectedIcon: Icon(Icons.local_florist),
           ),
         ],
       ),
       floatingActionButton: _index == 0
-        ? Padding(
-        padding: EdgeInsets.all(0),
-        child: SizedBox(
-          width: 110,
-          height: 70,
-          child: FloatingActionButton.extended(
-            onPressed: () {
-              Navigator.pushNamed(context, '/new_plant');
-            },
-            icon: Icon(Icons.add),
-            label: Text("Add  Plant"),
-          ),
-        ),
-      )
-      : null,
-        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+          ? Padding(
+              padding: EdgeInsets.all(0),
+              child: SizedBox(
+                width: 160,
+                height: 70,
+                child: FloatingActionButton.extended(
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/new_plant');
+                  },
+                  icon: Icon(Icons.add),
+                  label: Text("Dodaj roślinę"),
+                ),
+              ),
+            )
+          : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }

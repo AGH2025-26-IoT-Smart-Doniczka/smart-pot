@@ -388,7 +388,7 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
         children: const [
           Text('Aby wyszukać urządzenia, zezwól na Bluetooth i lokalizację.'),
           SizedBox(height: 12),
-          Text('Naciśnij "Scan again", aby ponownie poprosić o zgody.'),
+          Text('Naciśnij "Skanuj ponownie", aby ponownie poprosić o zgody.'),
         ],
       ),
     );
