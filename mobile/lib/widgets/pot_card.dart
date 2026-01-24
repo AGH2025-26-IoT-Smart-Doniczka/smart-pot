@@ -127,7 +127,7 @@ class PotCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text("ID: ${pot.potId}", style: Theme.of(context).textTheme.bodySmall),
+                    Text("Identyfikator: ${pot.potId}", style: Theme.of(context).textTheme.bodySmall),
                   ],
                 ),
               ),

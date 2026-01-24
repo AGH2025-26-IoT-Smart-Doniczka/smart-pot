@@ -17,19 +17,19 @@ class _LoginScreenState extends State<LoginScreen> {
     final authController = context.watch<AuthController>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Login')),
+      appBar: AppBar(title: const Text('Logowanie')),
       body: Padding(
         padding: EdgeInsets.all(24.0),
         child: SingleChildScrollView(
           child: Column(
             children: [
-              Text("Log in", style: Theme.of(context).textTheme.headlineMedium),
+              Text("Zaloguj się", style: Theme.of(context).textTheme.headlineMedium),
               SizedBox(height: 40),
-              TextField(controller: _emailController, decoration: InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email)),),
+              TextField(controller: _emailController, decoration: InputDecoration(labelText: 'Adres e-mail', prefixIcon: Icon(Icons.email)),),
               SizedBox(height: 40),
               TextField(
                 controller: _passwordController,
-                decoration: InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock)),
+                decoration: InputDecoration(labelText: 'Hasło', prefixIcon: Icon(Icons.lock)),
                 obscureText: true,
               ),
               SizedBox(height: 10),
@@ -65,7 +65,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 50),
                   ),
-                  child: const Text('Login')),
+                  child: const Text('Zaloguj się')),
 
               SizedBox(height: 20),
               TextButton(

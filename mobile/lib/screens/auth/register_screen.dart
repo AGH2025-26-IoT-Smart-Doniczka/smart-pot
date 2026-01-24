@@ -18,36 +18,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     final authController = context.watch<AuthController>();
     return Scaffold(
-      appBar: AppBar(title: const Text('Register')),
+      appBar: AppBar(title: const Text('Rejestracja')),
       body: Padding(
         padding: EdgeInsets.all(24.0),
         child: SingleChildScrollView(
           child: Column(
             children: [
               Text(
-                "Register",
+                "Rejestracja",
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
               SizedBox(height: 40),
               TextField(
-                decoration: InputDecoration(labelText: 'Username', prefixIcon: Icon(Icons.person)),
+                decoration: InputDecoration(labelText: 'Nazwa użytkownika', prefixIcon: Icon(Icons.person)),
                 controller: _usernameController,
               ),
               SizedBox(height: 40),
               TextField(
-                decoration: InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email)),
+                decoration: InputDecoration(labelText: 'Adres e-mail', prefixIcon: Icon(Icons.email)),
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
               ),
               SizedBox(height: 40),
               TextField(
-                decoration: InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock)),
+                decoration: InputDecoration(labelText: 'Hasło', prefixIcon: Icon(Icons.lock)),
                 obscureText: true,
                 controller: _passwordController,
               ),
               SizedBox(height: 40),
               TextField(
-                decoration: InputDecoration(labelText: 'Confirm Password', prefixIcon: Icon(Icons.lock)),
+                decoration: InputDecoration(labelText: 'Powtórz hasło', prefixIcon: Icon(Icons.lock)),
                 obscureText: true,
                 controller: _confirmPasswordController,
               ),
@@ -108,7 +108,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           horizontal: 50,
                         ),
                       ),
-                      child: Text("Register"),
+                      child: Text("Zarejestruj się"),
                     ),
 
               SizedBox(height: 20),
