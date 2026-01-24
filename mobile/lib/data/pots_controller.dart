@@ -15,8 +15,8 @@ class PotsController extends ChangeNotifier {
 
   static final String _baseUrl = AppConfig.baseUrl;
 
-  List<Pot> _pots = [];
-  bool _isLoading = false;
+  final List<Pot> _pots = [];
+  final bool _isLoading = false;
   String? _error;
   List<Alert> _alerts = [];
   bool _isAlertsLoading = false;
