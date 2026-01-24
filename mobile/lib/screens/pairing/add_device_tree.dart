@@ -27,25 +27,12 @@ class _DeviceTreeState extends State<DeviceTree> {
   String _errorMessage = "";
   bool _isProcessing = false;
 
-  //do symulacji
-  bool isSimulation = false;
-
   // 1. Logika łączenia - GAP
   Future<void> _connectToDevice(BluetoothDevice device) async {
     setState(() {
       _step = PairingStep.connecting;
       _errorMessage = "";
     });
-
-    // SYMULACJA
-    if (isSimulation) {
-      print("SYMULACJA: Łączenie...");
-      await Future.delayed(const Duration(seconds: 2));
-      setState(() {
-        _step = PairingStep.wifiCredentials;
-      });
-      return;
-    }
 
     try {
       await device.connect(autoConnect: false, license: License.free);
@@ -87,7 +74,7 @@ class _DeviceTreeState extends State<DeviceTree> {
     });
 
     try {
-      if (_connectedDevice == null && isSimulation == false) {
+      if (_connectedDevice == null) {
         throw Exception("Utracono połączenie z urządzeniem BLE");
       }
 
@@ -95,23 +82,14 @@ class _DeviceTreeState extends State<DeviceTree> {
       if (currentUser == null)
         throw Exception("Użytkownik nie jest zalogowany. ");
 
-      final potId = isSimulation
-          ? "Sim-Pot-001"
-          : _connectedDevice!.remoteId.str.replaceAll(':', '');
+      final potId = _connectedDevice!.remoteId.str.replaceAll(':', '');
       print(_connectedDevice!.remoteId.str);
       print(potId);
 
-      Map<String, dynamic> pairingData;
-      if (!isSimulation) {
-        pairingData = await context.read<PotsController>().pairPotWithServer(
-          potId,
-        );
-      } else {
-        pairingData = {
-          "role": "owner",
-          "mqtt": {"username": "TEST_MQTT_USER", "password": "TEST_MQTT_PASS"},
-        };
-      }
+      Map<String, dynamic> pairingData = {
+        "role": "owner",
+        "mqtt": {"username": "TEST_MQTT_USER", "password": "TEST_MQTT_PASS"},
+      };
       print(pairingData);
       final String role = pairingData['role'] ?? 'user';
       final Map<String, dynamic> mqttData = pairingData['mqtt'] ?? {};
@@ -136,32 +114,28 @@ class _DeviceTreeState extends State<DeviceTree> {
 
       print("Status właściciela: ${isOwner}");
 
-      if (!isSimulation) {
-        if (_connectedDevice!.isConnected == false) {
-          await _connectedDevice!.connect(license: License.free);
-        }
-
-        // Persist freshly issued MQTT credentials for later use
-        if (mqttPass.isNotEmpty) {
-          const storage = FlutterSecureStorage();
-          await storage.write(key: 'mqtt_password', value: mqttPass);
-          if (mqttUser.isNotEmpty) {
-            await storage.write(key: 'mqtt_username', value: mqttUser);
-          }
-        }
-
-        await BleService().writeConfiguration(
-          device: _connectedDevice!,
-          ssid: ssid,
-          wifiPass: pass,
-          mqttPass: mqttPass,
-          mqttUser: mqttUser,
-        );
-
-        await _connectedDevice!.disconnect();
-      } else {
-        await Future.delayed(const Duration(seconds: 2));
+      if (_connectedDevice!.isConnected == false) {
+        await _connectedDevice!.connect(license: License.free);
       }
+
+      // Persist freshly issued MQTT credentials for later use
+      if (mqttPass.isNotEmpty) {
+        const storage = FlutterSecureStorage();
+        await storage.write(key: 'mqtt_password', value: mqttPass);
+        if (mqttUser.isNotEmpty) {
+          await storage.write(key: 'mqtt_username', value: mqttUser);
+        }
+      }
+
+      await BleService().writeConfiguration(
+        device: _connectedDevice!,
+        ssid: ssid,
+        wifiPass: pass,
+        mqttPass: mqttPass,
+        mqttUser: mqttUser,
+      );
+
+      await _connectedDevice!.disconnect();
 
       // if (mounted) {
       //   context
