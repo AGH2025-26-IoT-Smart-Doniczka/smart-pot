@@ -1,8 +1,5 @@
-import 'dart:convert';
-import 'dart:io';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:smart_pot_mobile_app/data/auth_controller.dart';
@@ -10,6 +7,7 @@ import 'package:smart_pot_mobile_app/data/pots_controller.dart';
 import 'package:smart_pot_mobile_app/screens/pairing/scan_view.dart';
 import 'package:smart_pot_mobile_app/screens/pairing/wifi_form.dart';
 import 'package:smart_pot_mobile_app/services/ble_service.dart';
+import 'package:smart_pot_mobile_app/services/ble_types.dart';
 
 enum PairingStep { scanning, connecting, wifiCredentials, success, failure }
 
@@ -22,33 +20,29 @@ class DeviceTree extends StatefulWidget {
 
 class _DeviceTreeState extends State<DeviceTree> {
   PairingStep _step = PairingStep.scanning;
-  BluetoothDevice? _connectedDevice;
+  BleDevice? _connectedDevice;
 
   String _errorMessage = "";
   bool _isProcessing = false;
 
-  // 1. Logika łączenia - GAP
-  Future<void> _connectToDevice(BluetoothDevice device) async {
+  Future<void> _connectToDevice(BleDevice device) async {
     setState(() {
       _step = PairingStep.connecting;
       _errorMessage = "";
     });
 
     try {
-      await device.connect(autoConnect: false, license: License.free);
+      await device.connect();
 
-      if (Platform.isAndroid)
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
         await Future.delayed(const Duration(milliseconds: 500));
+      }
 
       _connectedDevice = device;
 
-      // Parowanie (bounding)
-      if (device.bondState != BluetoothBondState.bonded) {
+      if (!await device.isBonded) {
         try {
-          print("Parowanie rozpoczęte");
           await device.createBond();
-
-          // czekamy na wyświetlenie okienka i wpisanie pinu prez użytkownika
           await Future.delayed(const Duration(seconds: 3));
         } catch (e) {
           print("Ostrzeżenie przy parowaniu: $e");
@@ -82,8 +76,8 @@ class _DeviceTreeState extends State<DeviceTree> {
       if (currentUser == null)
         throw Exception("Użytkownik nie jest zalogowany. ");
 
-      final potId = _connectedDevice!.remoteId.str.replaceAll(':', '');
-      print(_connectedDevice!.remoteId.str);
+      final potId = _connectedDevice!.id.replaceAll(':', '');
+      print(_connectedDevice!.id);
       print(potId);
 
       Map<String, dynamic> pairingData = {
@@ -97,7 +91,6 @@ class _DeviceTreeState extends State<DeviceTree> {
       String mqttUser = mqttData['username'] ?? '';
       String mqttPass = mqttData['password'] ?? '';
 
-      // If backend did not return MQTT credentials, try previously stored ones.
       if (mqttPass.isEmpty) {
         const storage = FlutterSecureStorage();
         final storedPass = await storage.read(key: 'mqtt_password');
@@ -114,11 +107,10 @@ class _DeviceTreeState extends State<DeviceTree> {
 
       print("Status właściciela: ${isOwner}");
 
-      if (_connectedDevice!.isConnected == false) {
-        await _connectedDevice!.connect(license: License.free);
+      if (await _connectedDevice!.isConnected == false) {
+        await _connectedDevice!.connect();
       }
 
-      // Persist freshly issued MQTT credentials for later use
       if (mqttPass.isNotEmpty) {
         const storage = FlutterSecureStorage();
         await storage.write(key: 'mqtt_password', value: mqttPass);
@@ -137,15 +129,13 @@ class _DeviceTreeState extends State<DeviceTree> {
 
       await _connectedDevice!.disconnect();
 
-      // if (mounted) {
-      //   context
-      //       .read<PotsController>()
-      //       // .fetchPots(); // odświeżanie listy doniczek
-      //   setState(() {
-      //     _isProcessing = false;
-      //     _step = PairingStep.success;
-      //   });
-      // }
+      if (mounted) {
+        context.read<PotsController>().fetchPots();
+        setState(() {
+          _isProcessing = false;
+          _step = PairingStep.success;
+        });
+      }
     } catch (e) {
       setState(() {
         _errorMessage = "Wystąpił błąd: $e";

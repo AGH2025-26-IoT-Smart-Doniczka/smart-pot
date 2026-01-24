@@ -6,14 +6,14 @@ import 'package:smart_pot_mobile_app/models/pot_data.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
+
 class PotsController extends ChangeNotifier {
   final AuthController _authController;
 
-  //TODO: to potem należy schować gdzieś do zmiennych środowiskowych
-  static const String _baseUrl = AppConfig.baseUrl;
+  static final String _baseUrl = AppConfig.baseUrl;
 
-  final List<Pot> _pots = [];
-  final bool _isLoading = false;
+  List<Pot> _pots = [];
+  bool _isLoading = false;
   String? _error;
 
   List<Pot> get pots => _pots;
@@ -22,49 +22,49 @@ class PotsController extends ChangeNotifier {
 
   PotsController(this._authController);
 
-  // Future<void> fetchPots() async {
-  //   print("Fetching pots...");
+  Future<void> fetchPots() async {
+    print("Fetching pots...");
 
-  //   final user = _authController.currentUser;
-  //   if (user == null) {
-  //     _error = "Użytkownik nie jest zalogowany";
-  //     _pots = [];
-  //     notifyListeners();
-  //     return;
-  //   }
+    final user = _authController.currentUser;
+    if (user == null) {
+      _error = "Użytkownik nie jest zalogowany";
+      _pots = [];
+      notifyListeners();
+      return;
+    }
 
-  //   _isLoading = true;
-  //   _error = null;
-  //   notifyListeners();
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
 
-  //   try {
-  //     final response = await http.get(Uri.parse(_baseUrl));
-  //     if (response.statusCode != 200) {
-  //       _error = "Błąd pobierania danych doniczek: ${response.statusCode}";
-  //       return;
-  //     }
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/pots'),
+        headers: {
+          'Authorization': 'Bearer ${user.token}',
+        },
+      );
+      if (response.statusCode != 200) {
+        _error = "Błąd pobierania danych doniczek: ${response.statusCode}";
+        return;
+      }
 
-  //     // Dekodujemy cały JSON
-  //     final Map<String, dynamic> jsonData = jsonDecode(response.body);
+      // Dekodujemy cały JSON
+      final Map<String, dynamic> jsonData = jsonDecode(response.body);
 
-  //     // Wyciągamy listę doniczek
-  //     final List<dynamic> potsJson = jsonData['pots'] ?? [];
+      // Wyciągamy listę doniczek
+      final List<dynamic> potsJson = jsonData['pots'] ?? [];
 
-  //     // Filtrujemy doniczki należące do zalogowanego użytkownika
-  //     final userPotsJson = potsJson
-  //         .where((pot) => pot['userPublicKey'] == user.id)
-  //         .toList();
-
-  //     // Mapujemy JSON na obiekty Pot
-  //     _pots = userPotsJson.map((json) => Pot.fromJson(json)).toList();
-  //   } catch (e) {
-  //     _error = "Błąd pobierania danych doniczek: $e";
-  //     _pots = [];
-  //   } finally {
-  //     _isLoading = false;
-  //     notifyListeners();
-  //   }
-  // }
+      // Mapujemy JSON na obiekty Pot
+      _pots = potsJson.map((json) => Pot.fromJson(json)).toList();
+    } catch (e) {
+      _error = "Błąd pobierania danych doniczek: $e";
+      _pots = [];
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
 
   Future<Map<String, dynamic>> pairPotWithServer(String potId) async {
     final user = _authController.currentUser;

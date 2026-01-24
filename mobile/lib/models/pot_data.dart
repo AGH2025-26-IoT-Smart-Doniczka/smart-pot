@@ -16,7 +16,7 @@ class PotData {
   });
 
   // TODO: Domyślne wartości chyba nie powinny być '0'
-  factory PotData.fromJson(Map<String, dynamic> json){
+  factory PotData.fromJson(Map<dynamic, dynamic> json) {
     return PotData(
       airTemp: (json['air_temp'] ?? 0).toDouble(),
       airHumidity: (json['air_humidity'] ?? 0).toDouble(),
@@ -36,8 +36,6 @@ class PotData {
   };
 }
 
-
-
 class Pot {
   final String id;
   final String potId;
@@ -55,16 +53,23 @@ class Pot {
     required this.name,
   });
 
-  factory Pot.fromJson(Map<String, dynamic> json){
+  factory Pot.fromJson(Map<String, dynamic> json) {
+    final potId = json['pot_id'] ?? json['potId'] ?? json['id'] ?? "UNKNOWN";
+    final lastMeasure = json['last_measure'] ?? json['data'] ?? {};
+    final lastMeasureMap = lastMeasure is Map<String, dynamic>
+        ? lastMeasure
+        : {};
+
     return Pot(
-      id: json['id'] ?? "",
-      potId: json['potId'] ?? "UNKNOWN",
-      name: json['name'] ?? "UNKNOWN",
-      timeStamp: json['timestamp'] ?? "Time not specified",
-      data: PotData.fromJson(json['data'] ?? {}),
-      userId: json['userPublicKey'] ?? '',
+      id: json['id'] ?? potId,
+      potId: potId,
+      name: json['name'] ?? potId,
+      timeStamp:
+          lastMeasureMap['timestamp'] ??
+          json['timestamp'] ??
+          "Time not specified",
+      data: PotData.fromJson(lastMeasureMap),
+      userId: json['user_id'] ?? json['userPublicKey'] ?? '',
     );
   }
-
 }
-

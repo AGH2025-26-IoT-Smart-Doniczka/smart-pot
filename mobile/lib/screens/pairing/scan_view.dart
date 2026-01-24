@@ -1,47 +1,62 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:smart_pot_mobile_app/services/ble_adapter.dart';
+import 'package:smart_pot_mobile_app/services/ble_service.dart';
+import 'package:smart_pot_mobile_app/services/ble_types.dart';
 
 class DeviceScanScreen extends StatefulWidget {
   const DeviceScanScreen({super.key, required this.onDeviceSelected});
 
-  //dodatkowy callback
-  final Function(BluetoothDevice) onDeviceSelected;
+  final Function(BleDevice) onDeviceSelected;
 
   @override
   State<DeviceScanScreen> createState() => _DeviceScanScreenState();
 }
 
 class _DeviceScanScreenState extends State<DeviceScanScreen> {
-  StreamSubscription<List<ScanResult>>? _scanSub;
+  final BleAdapter _adapter = bleAdapter;
+
+  StreamSubscription<List<BleScanResult>>? _scanSub;
   bool _permissionsGranted = false;
   bool _permissionPermanentlyDenied = false;
-  List<BluetoothDevice> _connectedDevices = [];
-  List<BluetoothDevice> _bondedDevices = [];
+  bool _isSupported = true;
+
+  List<BleDevice> _connectedDevices = [];
+  List<BleDevice> _bondedDevices = [];
+  List<BleDevice> _webDevices = [];
 
   @override
   void initState() {
     super.initState();
 
-    _scanSub = FlutterBluePlus.scanResults.listen(
-      (results) => debugPrint('scanResults update: ${results.length} items'),
-      onError: (err) => debugPrint('scanResults error: $err'),
-    );
+    _isSupported = _adapter.isSupported;
 
-    _ensurePermissionsAndScan();
+    if (!kIsWeb) {
+      _scanSub = _adapter.scanResults.listen(
+        (results) => debugPrint('scanResults update: ${results.length} items'),
+        onError: (err) => debugPrint('scanResults error: $err'),
+      );
+
+      _ensurePermissionsAndScan();
+    } else {
+      _permissionsGranted = _isSupported;
+    }
   }
 
   @override
   void dispose() {
     _scanSub?.cancel();
-    FlutterBluePlus.stopScan();
+    _adapter.stopScan();
     super.dispose();
   }
 
   Future<void> _ensurePermissionsAndScan() async {
+    if (kIsWeb) return;
+
     final permissionResult = await _requestPermissions();
     if (!mounted) return;
 
@@ -58,16 +73,14 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
 
   Future<void> _loadConnectedAndBondedDevices() async {
     try {
-      final connected = FlutterBluePlus.connectedDevices;
+      final connected = await _adapter.getConnectedDevices();
       debugPrint('Connected devices: ${connected.length}');
 
-      final bonded = await FlutterBluePlus.bondedDevices;
+      final bonded = await _adapter.getBondedDevices();
       debugPrint('Bonded devices: ${bonded.length}');
 
-      final connectedIds = connected.map((d) => d.remoteId.str).toSet();
-      final bondedOnly = bonded
-          .where((d) => !connectedIds.contains(d.remoteId.str))
-          .toList();
+      final connectedIds = connected.map((d) => d.id).toSet();
+      final bondedOnly = bonded.where((d) => !connectedIds.contains(d.id)).toList();
 
       if (mounted) {
         setState(() {
@@ -81,6 +94,10 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
   }
 
   Future<({bool granted, bool permanentlyDenied})> _requestPermissions() async {
+    if (kIsWeb) {
+      return (granted: _isSupported, permanentlyDenied: false);
+    }
+
     final List<Permission> permissions;
 
     if (await _needsLegacyBluetoothPermission()) {
@@ -108,17 +125,7 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
 
   Future<void> _startScanning() async {
     try {
-      final state = await FlutterBluePlus.adapterState.first;
-      debugPrint('Adapter state: $state');
-      final isScanning = await FlutterBluePlus.isScanning.first;
-      debugPrint('isScanning before start: $isScanning');
-
-      if (isScanning) {
-        await FlutterBluePlus.stopScan();
-        debugPrint('Existing scan stopped');
-      }
-
-      await FlutterBluePlus.startScan(timeout: const Duration(seconds: 15));
+      await _adapter.startScan(timeout: const Duration(seconds: 15));
       debugPrint('Scan started');
     } catch (e) {
       debugPrint('Error while scanning: $e');
@@ -126,45 +133,75 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
   }
 
   Future<bool> _needsLegacyBluetoothPermission() async {
+    if (kIsWeb) return false;
     final info = await DeviceInfoPlugin().androidInfo;
     return info.version.sdkInt < 31;
   }
 
+  Future<void> _requestWebDevice() async {
+    final device = await _adapter.requestDevice(
+      serviceUuids: [BleService.SERVICE_UUID],
+    );
+
+    if (device == null || !mounted) return;
+
+    setState(() {
+      _webDevices.removeWhere((d) => d.id == device.id);
+      _webDevices.add(device);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (kIsWeb) {
+      return Scaffold(
+        body: Column(
+          children: [
+            ElevatedButton.icon(
+              onPressed: _isSupported ? _requestWebDevice : null,
+              label: const Text("Wybierz urządzenie"),
+              icon: const Icon(Icons.search),
+            ),
+            const SizedBox(height: 10),
+            Expanded(
+              child: !_isSupported
+                  ? _buildWebUnsupported()
+                  : _buildWebDeviceList(),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       body: Column(
         children: [
           ElevatedButton.icon(
             onPressed: _ensurePermissionsAndScan,
-            label: Text("Skanuj ponownie"),
-            icon: Icon(Icons.refresh),
+            label: const Text("Skanuj ponownie"),
+            icon: const Icon(Icons.refresh),
           ),
           const SizedBox(height: 10),
           Expanded(
             child: !_permissionsGranted
                 ? _buildPermissionInfo()
-                : StreamBuilder<List<ScanResult>>(
-                    stream: FlutterBluePlus.scanResults,
-                    initialData: [],
+                : StreamBuilder<List<BleScanResult>>(
+                    stream: _adapter.scanResults,
+                    initialData: const [],
                     builder: (context, snapshot) {
-                      final results = List<ScanResult>.from(
+                      final results = List<BleScanResult>.from(
                         snapshot.data ?? const [],
                       );
                       debugPrint('builder results count: ${results.length}');
 
-                      results.sort(
-                        (a, b) => b.rssi.compareTo(a.rssi),
-                      ); //sortowanie po sile sygnału
+                      results.sort((a, b) => b.rssi.compareTo(a.rssi));
 
                       final knownIds = {
-                        ..._connectedDevices.map((d) => d.remoteId.str),
-                        ..._bondedDevices.map((d) => d.remoteId.str),
+                        ..._connectedDevices.map((d) => d.id),
+                        ..._bondedDevices.map((d) => d.id),
                       };
                       final filteredResults = results
-                          .where(
-                            (r) => !knownIds.contains(r.device.remoteId.str),
-                          )
+                          .where((r) => !knownIds.contains(r.device.id))
                           .toList();
 
                       final hasConnected = _connectedDevices.isNotEmpty;
@@ -227,22 +264,58 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
     );
   }
 
-  Widget _buildDeviceTile(ScanResult res) {
-    final advName = res.advertisementData.advName;
-    final name = res.device.platformName.isNotEmpty
-        ? res.device.platformName
+  Widget _buildWebUnsupported() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            'Web Bluetooth nie jest wspierany w tej przeglądarce.',
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 12),
+          Text(
+            'Użyj Chrome oraz HTTPS lub localhost.',
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWebDeviceList() {
+    if (_webDevices.isEmpty) {
+      return const Center(child: Text("Nie znaleziono urządzeń"));
+    }
+
+    return ListView(
+      children: _webDevices
+          .map(
+            (device) => _buildKnownDeviceTile(
+              device,
+              isConnected: false,
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  Widget _buildDeviceTile(BleScanResult res) {
+    final advName = res.advName;
+    final name = res.device.name.isNotEmpty
+        ? res.device.name
         : advName.isNotEmpty
-        ? advName
-        : res.device.remoteId.str; // fallback jeśli brak nazwy
+            ? advName
+            : res.device.id;
 
     return ListTile(
       title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-      subtitle: Text(res.device.remoteId.str),
+      subtitle: Text(res.device.id),
       trailing: ElevatedButton(
         onPressed: () {
           widget.onDeviceSelected(res.device);
         },
-        child: Text("Połącz"),
+        child: const Text("Połącz"),
       ),
     );
   }
@@ -268,12 +341,10 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
   }
 
   Widget _buildKnownDeviceTile(
-    BluetoothDevice device, {
+    BleDevice device, {
     required bool isConnected,
   }) {
-    final name = device.platformName.isNotEmpty
-        ? device.platformName
-        : device.remoteId.str;
+    final name = device.name.isNotEmpty ? device.name : device.id;
 
     return ListTile(
       leading: Icon(
@@ -281,7 +352,7 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
         color: isConnected ? Colors.green : Colors.blue,
       ),
       title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-      subtitle: Text(device.remoteId.str),
+      subtitle: Text(device.id),
       trailing: ElevatedButton(
         onPressed: () {
           widget.onDeviceSelected(device);

@@ -22,7 +22,7 @@ class MyPotsScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => {}, //context.read<PotsController>().fetchPots(),
+            onPressed: () => {context.read<PotsController>().fetchPots()},
           ),
         ],
       ),

@@ -18,9 +18,9 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     // TODO: implement initState
     super.initState();
-    // WidgetsBinding.instance.addPostFrameCallback((_) {
-    //   context.read<PotsController>().fetchPots();
-    // });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<PotsController>().fetchPots();
+    });
   }
 
   @override
@@ -33,7 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "Twój właśny Smart Ogród",
+                "Twój własny Smart Ogród",
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               Align(

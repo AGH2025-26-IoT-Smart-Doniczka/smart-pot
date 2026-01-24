@@ -6,8 +6,9 @@ import 'package:smart_pot_mobile_app/models/user_model.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
+
 class AuthController extends ChangeNotifier {
-  static const String _baseUrl = AppConfig.baseUrl;
+  static final String _baseUrl = AppConfig.baseUrl;
   final _storage =
       const FlutterSecureStorage(); //bezpieczny magazyn do trzymania tokena jwt
 
