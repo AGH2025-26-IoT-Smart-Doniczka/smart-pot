@@ -462,12 +462,10 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
   }
 
   Widget _buildKnownDeviceTile(
-    BluetoothDevice device, {
+    BleDevice device, {
     required bool isConnected,
   }) {
-    final name = device.platformName.isNotEmpty
-        ? device.platformName
-        : device.remoteId.str;
+    final name = device.name.isNotEmpty ? device.name : device.id;
 
     return ListTile(
       leading: Icon(
@@ -475,7 +473,7 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
         color: isConnected ? Colors.green : Colors.blue,
       ),
       title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-      subtitle: Text(device.remoteId.str),
+      subtitle: Text(device.id),
       trailing: ElevatedButton(
         onPressed: () {
           widget.onDeviceSelected(device);

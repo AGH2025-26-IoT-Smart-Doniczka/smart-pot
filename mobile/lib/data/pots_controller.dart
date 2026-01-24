@@ -15,8 +15,8 @@ class PotsController extends ChangeNotifier {
 
   static final String _baseUrl = AppConfig.baseUrl;
 
-  final List<Pot> _pots = [];
-  final bool _isLoading = false;
+  List<Pot> _pots = [];
+  bool _isLoading = false;
   String? _error;
   List<Alert> _alerts = [];
   bool _isAlertsLoading = false;
@@ -117,17 +117,17 @@ class PotsController extends ChangeNotifier {
   Future<void> fetchPots() async {
     print("Fetching pots...");
 
-  //   final user = _authController.currentUser;
-  //   if (user == null) {
-  //     _error = "Użytkownik nie jest zalogowany";
-  //     _pots = [];
-  //     notifyListeners();
-  //     return;
-  //   }
+    final user = _authController.currentUser;
+    if (user == null) {
+      _error = "Użytkownik nie jest zalogowany";
+      _pots = [];
+      notifyListeners();
+      return;
+    }
 
-  //   _isLoading = true;
-  //   _error = null;
-  //   notifyListeners();
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
 
     try {
       final response = await http.get(
@@ -152,11 +152,11 @@ class PotsController extends ChangeNotifier {
         return;
       }
 
-  //     // Dekodujemy cały JSON
-  //     final Map<String, dynamic> jsonData = jsonDecode(response.body);
+      // Dekodujemy cały JSON
+      final Map<String, dynamic> jsonData = jsonDecode(response.body);
 
-  //     // Wyciągamy listę doniczek
-  //     final List<dynamic> potsJson = jsonData['pots'] ?? [];
+      // Wyciągamy listę doniczek
+      final List<dynamic> potsJson = jsonData['pots'] ?? [];
 
       // Mapujemy JSON na obiekty Pot
       _pots = potsJson.map((json) => Pot.fromJson(json)).toList();
