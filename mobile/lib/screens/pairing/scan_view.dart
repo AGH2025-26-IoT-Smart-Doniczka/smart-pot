@@ -172,7 +172,9 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
                       final hasScanned = filteredResults.isNotEmpty;
 
                       if (!hasConnected && !hasBonded && !hasScanned) {
-                        return const Center(child: Text("Nie znaleziono urządzeń"));
+                        return const Center(
+                          child: Text("Nie znaleziono urządzeń"),
+                        );
                       }
 
                       return ListView(
@@ -221,18 +223,6 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
                   ),
           ),
         ],
-      ),
-      //do Symulacji
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          final fakeDevice = BluetoothDevice(
-            remoteId: const DeviceIdentifier("00:00:00:00:00:00"),
-          );
-          widget.onDeviceSelected(fakeDevice);
-        },
-        label: const Text("SYMULACJA"),
-        icon: const Icon(Icons.bug_report),
-        backgroundColor: Colors.orange,
       ),
     );
   }
