@@ -5,8 +5,9 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:smart_pot_mobile_app/models/user_model.dart';
 import 'package:http/http.dart' as http;
 
+import '../config/app_config.dart';
 class AuthController extends ChangeNotifier {
-  static const String _baseUrl = 'http://192.168.100.30:8000';
+  static const String _baseUrl = AppConfig.baseUrl;
   final _storage =
       const FlutterSecureStorage(); //bezpieczny magazyn do trzymania tokena jwt
 
@@ -79,7 +80,7 @@ class AuthController extends ChangeNotifier {
       }
     } catch (e) {
       _errorMessage =
-          'Błąd połączenia: ${e}. Sprawdź czy serwer działa i adres jest poprawny';
+          'Błąd połączenia: $e. Sprawdź czy serwer działa i adres jest poprawny';
       return false;
     } finally {
       _setIsLoading(false);
@@ -111,8 +112,9 @@ class AuthController extends ChangeNotifier {
 
   String _extractErrorMessage(dynamic data, int statusCode) {
     // Fast path for plain text responses
-    if (data is String)
+    if (data is String) {
       return data.isNotEmpty ? data : 'Błąd autoryzacji $statusCode';
+    }
 
     // If backend returns { detail: ... }
     if (data is Map<String, dynamic>) {
