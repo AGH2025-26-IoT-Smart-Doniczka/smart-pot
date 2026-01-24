@@ -1,5 +1,4 @@
 import os
-import threading
 import asyncio
 from contextlib import asynccontextmanager
 
@@ -22,6 +21,7 @@ mqtt_client = MQTTClient(
     session_expiry_interval=0xFFFFFFFF,
 )
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Starting application...")
@@ -31,14 +31,22 @@ async def lifespan(app: FastAPI):
     loop = asyncio.get_running_loop()
     await loop.run_in_executor(None, mqtt_client.connect)
 
-    await loop.run_in_executor(None, lambda: mqtt_client.subscribe("devices/+/watering/status", watering_status_handler, qos=1))
-    await loop.run_in_executor(None, lambda: mqtt_client.subscribe("devices/+/telemetry", telemetry_handler, qos=1))
-    await loop.run_in_executor(None, lambda: mqtt_client.subscribe("devices/+/hard-reset", hard_reset_handler, qos=1))
+    await loop.run_in_executor(
+        None,
+        lambda: mqtt_client.subscribe("devices/+/watering/status", watering_status_handler, qos=1),
+    )
+    await loop.run_in_executor(
+        None, lambda: mqtt_client.subscribe("devices/+/telemetry", telemetry_handler, qos=1)
+    )
+    await loop.run_in_executor(
+        None, lambda: mqtt_client.subscribe("devices/+/hard-reset", hard_reset_handler, qos=1)
+    )
 
     yield
 
     print("Stopping application...")
     await loop.run_in_executor(None, mqtt_client.disconnect)
+
 
 app = FastAPI(lifespan=lifespan)
 
@@ -59,6 +67,7 @@ app.add_middleware(
 app.include_router(user_router, prefix="/user", tags=["user"])
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(pots_router, prefix="/pots", tags=["pots"])
+
 
 @app.get("/health")
 def health():

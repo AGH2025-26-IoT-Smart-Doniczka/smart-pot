@@ -1,5 +1,5 @@
 from datetime import datetime
-import json
+from typing import Any
 
 from psycopg2 import IntegrityError
 from psycopg2.extras import RealDictCursor
@@ -8,46 +8,36 @@ from ..db.client import get_connection
 
 
 def pot_exists(pot_id: str) -> bool:
-    try:
-        conn = get_connection()
-        with conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute(
-                    """
-                    SELECT 1
-                    FROM pots
-                    WHERE pot_id = %s;
-                    """,
-                    (pot_id,)
-                )
-                row = cur.fetchone()
-                return row is not None
-
-    finally:
-        conn.close()
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT 1
+                FROM pots
+                WHERE pot_id = %s;
+                """,
+                (pot_id,),
+            )
+            row = cur.fetchone()
+            return row is not None
 
 
 def user_exists(user_id: str) -> bool:
-    try:
-        conn = get_connection()
-        with conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute(
-                    """
-                    SELECT 1
-                    FROM users
-                    WHERE user_id = %s;
-                    """,
-                    (user_id,)
-                )
-                row = cur.fetchone()
-                return row is not None
-
-    finally:
-        conn.close()
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT 1
+                FROM users
+                WHERE user_id = %s;
+                """,
+                (user_id,),
+            )
+            row = cur.fetchone()
+            return row is not None
 
 
-def pot_has_owner(pot_id: str) -> str | None:
+def pot_has_owner(pot_id: str) -> tuple[Any, ...] | None:
     conn = get_connection()
     try:
         with conn:
@@ -61,7 +51,7 @@ def pot_has_owner(pot_id: str) -> str | None:
                     AND is_owner = TRUE
                     LIMIT 1;
                     """,
-                    (pot_id,)
+                    (pot_id,),
                 )
                 return cur.fetchone()
     finally:
@@ -83,7 +73,7 @@ def get_pot_owner_username(pot_id: str) -> str | None:
                       AND c.is_active = TRUE
                     LIMIT 1;
                     """,
-                    (pot_id,)
+                    (pot_id,),
                 )
                 row = cur.fetchone()
                 if row:
@@ -93,42 +83,35 @@ def get_pot_owner_username(pot_id: str) -> str | None:
         conn.close()
 
 
-def insert_connection(pot_id: str, user_id: str, has_owner: bool) -> dict | None:
-    conn = get_connection()
+def insert_connection(pot_id: str, user_id: str, has_owner: bool) -> dict[str, Any] | None:
+    if not user_exists(user_id):
+        raise ValueError(f"User with id {user_id} does not exist")
 
-    try:
-        if not user_exists(user_id):
-            raise ValueError(f"User with id {user_id} does not exist")
+    if not pot_exists(pot_id):
+        insert_pot(pot_id)
 
-        if not pot_exists(pot_id):
-            insert_pot(pot_id)
-        
-        is_owner = not has_owner
-        is_admin = not has_owner
+    is_owner = not has_owner
+    is_admin = not has_owner
 
-        with conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute(
-                    """
-                    INSERT INTO connections (
-                        pot_id, user_id, is_active, is_admin, is_owner
-                    )
-                    VALUES (%s, %s, TRUE, %s, %s)
-                    ON CONFLICT DO NOTHING
-                    RETURNING *;
-                    """,
-                    (pot_id, user_id, is_admin, is_owner)
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                INSERT INTO connections (
+                    pot_id, user_id, is_active, is_admin, is_owner
                 )
-                return cur.fetchone()
+                VALUES (%s, %s, TRUE, %s, %s)
+                ON CONFLICT DO NOTHING
+                RETURNING *;
+                """,
+                (pot_id, user_id, is_admin, is_owner),
+            )
+            return cur.fetchone()
 
-    finally:
-        conn.close()
 
-
-def insert_pot(pot_id: str) -> dict | None:
+def insert_pot(pot_id: str) -> dict[str, Any] | None:
     try:
-        conn = get_connection()
-        with conn:
+        with get_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     """
@@ -137,7 +120,7 @@ def insert_pot(pot_id: str) -> dict | None:
                     ON CONFLICT DO NOTHING
                     RETURNING *;
                     """,
-                    (pot_id,)
+                    (pot_id,),
                 )
                 inserted_row = cur.fetchone()
                 print(f"[insert_pot] Inserted new pot with id={pot_id}")
@@ -146,14 +129,10 @@ def insert_pot(pot_id: str) -> dict | None:
     except IntegrityError as e:
         raise e
 
-    finally:
-        conn.close()
 
-
-def watering_update(pot_id: str, is_watering: bool) -> dict | None:
+def watering_update(pot_id: str, is_watering: bool) -> dict[str, Any] | None:
     try:
-        conn = get_connection()
-        with conn:
+        with get_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     """
@@ -162,7 +141,7 @@ def watering_update(pot_id: str, is_watering: bool) -> dict | None:
                     WHERE pot_id = %s
                     RETURNING *;
                     """,
-                    (is_watering, pot_id)
+                    (is_watering, pot_id),
                 )
                 updated_row = cur.fetchone()
                 return updated_row
@@ -170,38 +149,36 @@ def watering_update(pot_id: str, is_watering: bool) -> dict | None:
     except IntegrityError as e:
         raise e
 
-    finally:
-        conn.close()
-
 
 def get_watering_status(pot_id: str) -> bool:
-    try:
-        conn = get_connection()
-        with conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute(
-                    """
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
                     SELECT is_watering
                     FROM pots
                     WHERE pot_id = %s;
                     """,
-                    (pot_id,)
-                )
-                row = cur.fetchone()
-                if row is None:
-                    raise ValueError(f"Pot with id {pot_id} not found")
-                return row["is_watering"]
-
-    finally:
-        conn.close()
+                (pot_id,),
+            )
+            row = cur.fetchone()
+            if row is None:
+                raise ValueError(f"Pot with id {pot_id} not found")
+            return row["is_watering"]
 
 
-def measures_insert(pot_id: str, timestamp: float, air_temp: float, air_pressure: float, soil_moisture: int, illuminance: int) -> dict | None:
+def measures_insert(
+    pot_id: str,
+    timestamp: float,
+    air_temp: float,
+    air_pressure: float,
+    soil_moisture: int,
+    illuminance: int,
+) -> dict[str, Any] | None:
     try:
-        conn = get_connection()
         if not pot_exists(pot_id):
             raise ValueError(f"Pot with id {pot_id} does not exist")
-        with conn:
+        with get_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     """
@@ -220,28 +197,25 @@ def measures_insert(pot_id: str, timestamp: float, air_temp: float, air_pressure
                     )
                     RETURNING *;
                     """,
-                    (pot_id, timestamp, air_temp, air_pressure, soil_moisture, illuminance)
+                    (pot_id, timestamp, air_temp, air_pressure, soil_moisture, illuminance),
                 )
                 inserted_row = cur.fetchone()
-                print(f"[measures_insert] Inserted measures for pot_id={pot_id} at timestamp={timestamp}")
+                print(
+                    f"[measures_insert] Inserted measures for pot_id={pot_id} at timestamp={timestamp}"
+                )
                 return inserted_row
 
     except IntegrityError as e:
         raise e
 
-    finally:
-        conn.close()
 
-
-def get_history_measures(pot_id: str, count: int) -> list[dict]:
-    try:
-        conn = get_connection()
-        if not pot_exists(pot_id):
-            raise ValueError(f"Pot with id {pot_id} does not exist")
-        with conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute(
-                    """
+def get_history_measures(pot_id: str, count: int) -> list[dict[str, Any]]:
+    if not pot_exists(pot_id):
+        raise ValueError(f"Pot with id {pot_id} does not exist")
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
                     SELECT
                         timestamp,
                         air_temp,
@@ -253,74 +227,64 @@ def get_history_measures(pot_id: str, count: int) -> list[dict]:
                     ORDER BY timestamp DESC
                     LIMIT %s;
                     """,
-                    (pot_id, count)
+                (pot_id, count),
+            )
+            result: list[dict[str, Any]] = []
+
+            for row in cur.fetchall():
+                result.append(
+                    {
+                        "timestamp": row["timestamp"].isoformat()
+                        if isinstance(row["timestamp"], datetime)
+                        else row["timestamp"],
+                        "data": {
+                            "lux": row["illuminance"],
+                            "tem": row["air_temp"],
+                            "moi": row["soil_moisture"],
+                            "pre": row["air_pressure"],
+                        },
+                    }
                 )
-                rows = cur.fetchall()
 
-                result: list[dict] = []
-
-                for row in rows:
-                    result.append(
-                        {
-                            "timestamp": row["timestamp"].isoformat()
-                            if isinstance(row["timestamp"], datetime)
-                            else row["timestamp"],
-                            "data": {
-                                "lux": row["illuminance"],
-                                "tem": row["air_temp"],
-                                "moi": row["soil_moisture"],
-                                "pre": row["air_pressure"],
-                            },
-                        }
-                    )
-
-                return result
-
-    finally:
-        conn.close()
+            return result
 
 
-def update_config(pot_id: str, data: dict) -> dict | None:
-    conn = get_connection()
-
+def update_config(pot_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
     if not pot_exists(pot_id):
         raise ValueError(f"Pot with id {pot_id} does not exist")
 
-    try:
-        with conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute(
-                    """
-                    UPDATE pots
-                    SET
-                        max_temperature = %(max_temp)s,
-                        min_temperature = %(min_temp)s,
-                        humidity_thresholds = jsonb_build_object(
-                            'very_low', %(humidity_min)s,
-                            'low', %(humidity_opt_min)s,
-                            'high', %(humidity_opt_max)s,
-                            'very_high', %(humidity_max)s
-                        ),
-                        illuminance_type = %(illuminance)s,
-                        measure_interval_sec = %(interval_sec)s
-                    WHERE pot_id = %(pot_id)s
-                    RETURNING *;
-                    """,
-                    {
-                        "pot_id": pot_id,
-                        "max_temp": data["max_temp"],
-                        "min_temp": data["min_temp"],
-                        "humidity_min": data["humidity"]["min"],
-                        "humidity_opt_min": data["humidity"]["opt_min"],
-                        "humidity_opt_max": data["humidity"]["opt_max"],
-                        "humidity_max": data["humidity"]["max"],
-                        "illuminance": data["illuminance"],
-                        "interval_sec": data["sleep_interval_sec"],
-                    },
-                )
-                return cur.fetchone()
-    finally:
-        conn.close()
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                UPDATE pots
+                SET
+                    max_temperature = %(max_temp)s,
+                    min_temperature = %(min_temp)s,
+                    humidity_thresholds = jsonb_build_object(
+                        'very_low', %(humidity_min)s,
+                        'low', %(humidity_opt_min)s,
+                        'high', %(humidity_opt_max)s,
+                        'very_high', %(humidity_max)s
+                    ),
+                    illuminance_type = %(illuminance)s,
+                    measure_interval_sec = %(interval_sec)s
+                WHERE pot_id = %(pot_id)s
+                RETURNING *;
+                """,
+                {
+                    "pot_id": pot_id,
+                    "max_temp": data["max_temp"],
+                    "min_temp": data["min_temp"],
+                    "humidity_min": data["humidity"]["min"],
+                    "humidity_opt_min": data["humidity"]["opt_min"],
+                    "humidity_opt_max": data["humidity"]["opt_max"],
+                    "humidity_max": data["humidity"]["max"],
+                    "illuminance": data["illuminance"],
+                    "interval_sec": data["sleep_interval_sec"],
+                },
+            )
+            return cur.fetchone()
 
 
 def update_owner_connection(pot_id: str, new_owner_id: str) -> None:
@@ -335,7 +299,7 @@ def update_owner_connection(pot_id: str, new_owner_id: str) -> None:
                         is_owner = FALSE
                     WHERE pot_id = %s;
                     """,
-                    (pot_id,)
+                    (pot_id,),
                 )
 
                 cur.execute(
@@ -348,10 +312,71 @@ def update_owner_connection(pot_id: str, new_owner_id: str) -> None:
                         is_admin  = EXCLUDED.is_admin,
                         is_owner  = EXCLUDED.is_owner;
                     """,
-                    (new_owner_id, pot_id)
+                    (new_owner_id, pot_id),
                 )
     except Exception:
         conn.rollback()
         raise SystemError("Failed to update owner connection transaction")
     finally:
         conn.close()
+
+
+def get_user_pots(user_id: str) -> list[dict[str, Any]]:
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT
+                    p.pot_id,
+                    c.user_id,
+                    m.timestamp,
+                    m.air_temp,
+                    m.air_pressure,
+                    m.soil_moisture,
+                    m.illuminance
+                FROM connections c
+                JOIN pots p ON p.pot_id = c.pot_id
+                LEFT JOIN LATERAL (
+                    SELECT
+                        timestamp,
+                        air_temp,
+                        air_pressure,
+                        soil_moisture,
+                        illuminance
+                    FROM measures
+                    WHERE pot_id = p.pot_id
+                    ORDER BY timestamp DESC
+                    LIMIT 1
+                ) m ON TRUE
+                WHERE c.user_id = %s
+                  AND c.is_active = TRUE
+                ORDER BY p.pot_id;
+                """,
+                (user_id,),
+            )
+            rows = cur.fetchall()
+
+            pots: list[dict[str, Any]] = []
+            for row in rows:
+                last_measure = None
+                if row["timestamp"] is not None:
+                    last_measure = {
+                        "timestamp": row["timestamp"].isoformat()
+                        if isinstance(row["timestamp"], datetime)
+                        else row["timestamp"],
+                        "air_temp": row["air_temp"],
+                        "air_pressure": row["air_pressure"],
+                        "soil_moisture": row["soil_moisture"],
+                        "illuminance": row["illuminance"],
+                    }
+
+                pots.append(
+                    {
+                        "pot_id": row["pot_id"],
+                        "user_id": row["user_id"],
+                        "name": row["pot_id"],
+                        "last_measure": last_measure,
+                    }
+                )
+
+            return pots

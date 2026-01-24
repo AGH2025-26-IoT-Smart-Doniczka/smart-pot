@@ -2,19 +2,17 @@ import os
 from decimal import Decimal
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, status, Query
+from fastapi import APIRouter, HTTPException, status, Query, Header
+from jwt import InvalidTokenError
 
 from ..schemas.pots import (
-    WaterPlantRequest, 
+    WaterPlantRequest,
     PairingRequest,
     ConfigChangeRequest,
-    ChangeOwnerRequest
+    ChangeOwnerRequest,
 )
 from ..integrations.mqtt.MQTTClient import MQTTClient
-from ..schemas.mqtt.pots import (
-    WaterPlantMqttRequest,
-    AddUserRequest
-)
+from ..schemas.mqtt.pots import WaterPlantMqttRequest, AddUserRequest
 from ..integrations.repositories.pots import (
     get_watering_status,
     pot_exists,
@@ -24,9 +22,11 @@ from ..integrations.repositories.pots import (
     insert_connection,
     get_history_measures,
     update_config,
-    update_owner_connection
+    update_owner_connection,
+    get_user_pots,
 )
 from ..domain.hard_reset_handler import wait_for_hard_reset
+from ..utils.jwt_token import decode_access_token
 
 router = APIRouter()
 
@@ -42,16 +42,50 @@ def json_safe(obj):
 
 
 # split functionality into smaller functions later ( ﾉ ﾟｰﾟ)ﾉ
+@router.get("", status_code=status.HTTP_200_OK)
+def list_user_pots(authorization: str | None = Header(default=None)):
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Authorization header",
+        )
+
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Authorization header",
+        )
+
+    token = authorization.split(" ", 1)[1].strip()
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Authorization header",
+        )
+
+    try:
+        payload = decode_access_token(token)
+    except InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+        )
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+        )
+
+    pots = get_user_pots(user_id)
+    return {"pots": json_safe(pots)}
+
+
 @router.post("/{pot_id}/pairing", status_code=status.HTTP_201_CREATED)
 def pair_plant_with_user(pot_id: str, data: PairingRequest):
     has_owner = pot_has_owner(pot_id)
-    result = {
-            "role": "owner",
-            "mqtt": {
-                "username": pot_id,
-                "password": ""
-            }
-    }
+    result = {"role": "owner", "mqtt": {"username": pot_id, "password": ""}}
     print(f"Pot {pot_id} has owner: {has_owner}")
     if has_owner is not None and has_owner[0] == data.user_id:
         return result
@@ -59,15 +93,12 @@ def pair_plant_with_user(pot_id: str, data: PairingRequest):
     try:
         insert_connection(pot_id, data.user_id, has_owner)
     except ValueError as ve:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(ve)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ve))
 
     if has_owner is not None:
         result["role"] = "user"
         return result
-    
+
     mqtt_password = uuid4().hex
     client_id = f"backend-pairing-{uuid4().hex[:8]}"
 
@@ -76,10 +107,7 @@ def pair_plant_with_user(pot_id: str, data: PairingRequest):
 
     try:
         topic = "users/add"
-        payload = AddUserRequest(
-            username=pot_id,
-            password=mqtt_password
-        ).model_dump()
+        payload = AddUserRequest(username=pot_id, password=mqtt_password).model_dump()
         print(f"Publishing to topic {topic} payload {payload}")
 
         mqqt_client.publish(topic, payload, qos=1, retain=False)
@@ -96,15 +124,8 @@ def get_measures(pot_id: str, count: int = Query(10, ge=1, le=100)):
     try:
         measures = get_history_measures(pot_id, count)
     except ValueError as ve:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(ve)
-        )
-    return {
-        "pot_id": pot_id,
-        "count": count, 
-        "measures" : measures
-        }
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ve))
+    return {"pot_id": pot_id, "count": count, "measures": measures}
 
 
 @router.post("/{pot_id}/actions/water", status_code=status.HTTP_202_ACCEPTED)
@@ -146,7 +167,7 @@ def water_status(pot_id: str):
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Cannot fetch watering status: {e}"
+            detail=f"Cannot fetch watering status: {e}",
         )
 
     if is_watering:
@@ -183,20 +204,22 @@ def config_change(pot_id: str, data: ConfigChangeRequest):
 
     client_id = f"backend-config-{uuid4().hex[:8]}"
 
-    new_config = json_safe({
-        "lux": updated["illuminance_type"],
-        "moi": [
-            updated["humidity_thresholds"]["very_low"],
-            updated["humidity_thresholds"]["low"],
-            updated["humidity_thresholds"]["high"],
-            updated["humidity_thresholds"]["very_high"],
-        ],
-        "tem": [
-            updated["min_temperature"],
-            updated["max_temperature"],
-        ],
-        "sle": updated["measure_interval_sec"],
-    })
+    new_config = json_safe(
+        {
+            "lux": updated["illuminance_type"],
+            "moi": [
+                updated["humidity_thresholds"]["very_low"],
+                updated["humidity_thresholds"]["low"],
+                updated["humidity_thresholds"]["high"],
+                updated["humidity_thresholds"]["very_high"],
+            ],
+            "tem": [
+                updated["min_temperature"],
+                updated["max_temperature"],
+            ],
+            "sle": updated["measure_interval_sec"],
+        }
+    )
 
     mqtt_client = MQTTClient(client_id=client_id, persistent_session=False)
     mqtt_client.connect()
@@ -217,11 +240,7 @@ def config_change(pot_id: str, data: ConfigChangeRequest):
 def change_owner(pot_id: str, data: dict):
     new_user_id: str = data["user_id"]
 
-    fail = {
-        "changed": False,
-        "reason": "",
-        "owner": get_pot_owner_username(pot_id)
-    }
+    fail = {"changed": False, "reason": "", "owner": get_pot_owner_username(pot_id)}
 
     if not pot_exists(pot_id):
         fail["reason"] = "Pot not found"
@@ -238,9 +257,8 @@ def change_owner(pot_id: str, data: dict):
         update_owner_connection(pot_id=pot_id, new_owner_id=new_user_id)
     except SystemError as e:
         fail["reason"] = "Database error during owner change"
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=fail)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=fail
+        )
 
-    return {
-		"changed": True,
-		"newOwner": get_pot_owner_username(pot_id)
-    }
+    return {"changed": True, "newOwner": get_pot_owner_username(pot_id)}

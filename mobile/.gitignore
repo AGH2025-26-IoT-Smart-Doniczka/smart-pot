@@ -31,7 +31,6 @@ ios/Podfile.lock
 
 # --- Web ---
 web/build/
-lib/generated_plugin_registrant.dart
 
 # --- MacOS ---
 macos/Flutter/ephemeral/
