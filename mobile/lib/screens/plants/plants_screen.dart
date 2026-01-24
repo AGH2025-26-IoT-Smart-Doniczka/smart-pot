@@ -44,7 +44,7 @@ class MyPotsScreen extends StatelessWidget {
                   ElevatedButton(
                     onPressed: () {
                       // Tutaj w przyszłości nawigacja do parowania
-                      Navigator.pushNamed(context, '/scan');
+                      Navigator.pushNamed(context, '/new_plant');
                     },
                     child: const Text("Dodaj doniczkę"),
                   ),
