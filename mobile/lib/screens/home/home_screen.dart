@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_pot_mobile_app/data/pots_controller.dart';
 import 'package:smart_pot_mobile_app/widgets/alerts_container.dart';
+import 'package:smart_pot_mobile_app/screens/plants/pot_detail_screen.dart';
 import 'package:smart_pot_mobile_app/widgets/pot_card.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -78,6 +79,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                 "Temp: ${pot.data.airTemp.toStringAsFixed(1)}°C",
                             title: pot.potId,
                             imageUrl: "assets/images/test_pot.png",
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => PotDetailScreen(pot: pot),
+                                ),
+                              );
+                            },
                           ),
                         );
                       },
