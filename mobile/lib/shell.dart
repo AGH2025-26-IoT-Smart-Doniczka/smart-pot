@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:smart_pot_mobile_app/data/pots_controller.dart';
 import 'package:smart_pot_mobile_app/screens/home/home_screen.dart';
 import 'package:smart_pot_mobile_app/screens/plants/plants_screen.dart';
 import 'package:smart_pot_mobile_app/theme/theme_controller.dart';
@@ -13,6 +14,15 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<PotsController>().fetchPots();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
