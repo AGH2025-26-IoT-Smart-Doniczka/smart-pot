@@ -7,6 +7,7 @@ class PotMiniCard extends StatelessWidget {
   final String description;
   final String title;
   final String imageUrl;
+  final VoidCallback? onTap;
 
   const PotMiniCard({
     super.key,
@@ -14,6 +15,7 @@ class PotMiniCard extends StatelessWidget {
     required this.description,
     required this.title,
     required this.imageUrl,
+    this.onTap,
   });
 
   @override
@@ -22,48 +24,51 @@ class PotMiniCard extends StatelessWidget {
       width: 160,
       child: Card(
         clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Image.asset(
-                imageUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (c, _, __) => Container(
-                  color: Colors.grey.shade800,
-                  child: const Center(
-                    child: Icon(Icons.local_florist, size: 48),
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AspectRatio(
+                aspectRatio: 16 / 9,
+                child: Image.asset(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (c, _, __) => Container(
+                    color: Colors.grey.shade800,
+                    child: const Center(
+                      child: Icon(Icons.local_florist, size: 48),
+                    ),
                   ),
                 ),
               ),
-            ),
-            Padding(
-              padding: EdgeInsets.all(8),
-              child: Row(
-                children: [
-                  Text(statusEmoji, style: TextStyle(fontSize: 20)),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleMedium,
-                      overflow: TextOverflow.ellipsis,
+              Padding(
+                padding: EdgeInsets.all(8),
+                child: Row(
+                  children: [
+                    Text(statusEmoji, style: TextStyle(fontSize: 20)),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleMedium,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8),
-              child: Text(
-                description,
-                style: Theme.of(context).textTheme.bodySmall,
-                overflow: TextOverflow.ellipsis,
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  description,
+                  style: Theme.of(context).textTheme.bodySmall,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
-            SizedBox(height: 8),
-          ],
+              SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );
