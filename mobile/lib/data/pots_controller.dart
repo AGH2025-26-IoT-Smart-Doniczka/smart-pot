@@ -5,14 +5,15 @@ import 'package:smart_pot_mobile_app/data/auth_controller.dart';
 import 'package:smart_pot_mobile_app/models/pot_data.dart';
 import 'package:http/http.dart' as http;
 
+import '../config/app_config.dart';
 class PotsController extends ChangeNotifier {
   final AuthController _authController;
 
   //TODO: to potem należy schować gdzieś do zmiennych środowiskowych
-  static const String _baseUrl = 'http://192.168.100.30:8000';
+  static const String _baseUrl = AppConfig.baseUrl;
 
-  List<Pot> _pots = [];
-  bool _isLoading = false;
+  final List<Pot> _pots = [];
+  final bool _isLoading = false;
   String? _error;
 
   List<Pot> get pots => _pots;
@@ -68,10 +69,10 @@ class PotsController extends ChangeNotifier {
   Future<Map<String, dynamic>> pairPotWithServer(String potId) async {
     final user = _authController.currentUser;
     if (user == null) {
-      throw new Exception("Użytkownik nie jest zalogowany");
+      throw Exception("Użytkownik nie jest zalogowany");
     }
 
-    final url = Uri.parse('$_baseUrl/pots/${potId}/pairing');
+    final url = Uri.parse('$_baseUrl/pots/$potId/pairing');
 
     try {
       final response = await http.post(
