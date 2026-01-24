@@ -61,7 +61,7 @@ class _DeviceTreeState extends State<DeviceTree> {
           print("Parowanie rozpoczęte");
           await device.createBond();
 
-          // czekamy na wyświetlenie okienka i wpisanie pinu prezz użytkownika
+          // czekamy na wyświetlenie okienka i wpisanie pinu prez użytkownika
           await Future.delayed(const Duration(seconds: 3));
         } catch (e) {
           print("Ostrzeżenie przy parowaniu: $e");
