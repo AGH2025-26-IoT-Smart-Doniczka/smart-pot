@@ -30,24 +30,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               SizedBox(height: 40),
               TextField(
-                decoration: InputDecoration(labelText: 'Nazwa użytkownika', prefixIcon: Icon(Icons.person)),
+                decoration: InputDecoration(
+                  labelText: 'Nazwa użytkownika',
+                  prefixIcon: Icon(Icons.person),
+                ),
                 controller: _usernameController,
               ),
               SizedBox(height: 40),
               TextField(
-                decoration: InputDecoration(labelText: 'Adres e-mail', prefixIcon: Icon(Icons.email)),
+                decoration: InputDecoration(
+                  labelText: 'Adres e-mail',
+                  prefixIcon: Icon(Icons.email),
+                ),
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
               ),
               SizedBox(height: 40),
               TextField(
-                decoration: InputDecoration(labelText: 'Hasło', prefixIcon: Icon(Icons.lock)),
+                decoration: InputDecoration(
+                  labelText: 'Hasło',
+                  prefixIcon: Icon(Icons.lock),
+                ),
                 obscureText: true,
                 controller: _passwordController,
               ),
               SizedBox(height: 40),
               TextField(
-                decoration: InputDecoration(labelText: 'Powtórz hasło', prefixIcon: Icon(Icons.lock)),
+                decoration: InputDecoration(
+                  labelText: 'Powtórz hasło',
+                  prefixIcon: Icon(Icons.lock),
+                ),
                 obscureText: true,
                 controller: _confirmPasswordController,
               ),
@@ -84,7 +96,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           );
                           return;
                         }
-                        ;
                         if (pass != confirmPass) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
@@ -96,7 +107,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         final success = await authController.register(
                           email,
                           pass,
-                          username
+                          username,
                         );
                         if (success && context.mounted) {
                           Navigator.pushReplacementNamed(context, '/home');

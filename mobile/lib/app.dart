@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:smart_pot_mobile_app/constants.dart';
 import 'package:smart_pot_mobile_app/screens/auth/login_screen.dart';
 import 'package:smart_pot_mobile_app/screens/auth/register_screen.dart';
-import 'package:smart_pot_mobile_app/screens/home/home_screen.dart';
 import 'package:smart_pot_mobile_app/screens/pairing/add_device_tree.dart';
 import 'package:smart_pot_mobile_app/screens/plants/plants_screen.dart';
 import 'package:smart_pot_mobile_app/shell.dart';
