@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI):
         None, lambda: mqtt_client.subscribe("devices/+/logs", logs_handler, qos=1)
     )
     await loop.run_in_executor(
-        None, lambda: mqtt_client.subscribe("devices/+/hard-reset", hard_reset_handler, qos=1)
+        None, lambda: mqtt_client.subscribe("devices/+/logs", logs_handler, qos=1)
     )
 
     yield
