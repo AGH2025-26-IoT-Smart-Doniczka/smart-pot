@@ -96,4 +96,29 @@ class PotsController extends ChangeNotifier {
       throw Exception("Błąd połączenia z serwerem: $e");
     }
   }
+
+  Future<void> updatePotConfig(String potId, Map<String, dynamic> payload) async {
+    final user = _authController.currentUser;
+    if (user == null) {
+      throw Exception("Użytkownik nie jest zalogowany");
+    }
+
+    final url = Uri.parse('$_baseUrl/pots/$potId/actions/config');
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${user.token}',
+      },
+      body: json.encode(payload),
+    );
+
+    if (response.statusCode != 202) {
+      throw Exception(
+        "Błąd zapisu konfiguracji: ${response.statusCode}",
+      );
+    }
+
+    await fetchPots();
+  }
 }

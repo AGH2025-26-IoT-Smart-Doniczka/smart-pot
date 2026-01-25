@@ -251,7 +251,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n\t\"sleep_interval_sec\": 10,\r\n\t\"max_temp\": 30.2,\r\n\t\"min_temp\": 9.2,\r\n\t\"humidity\": {\r\n\t\t\"min\": 10,\r\n\t\t\"opt_min\": 30,\r\n\t\t\"opt_max\": 60,\r\n\t\t\"max\": 90\r\n\t},\r\n\t\"illuminance\": \"low\"\r\n}",
+					"raw": "{\r\n\t\"pot_name\": \"My Pot\",\r\n\t\"measure_interval_sec\": 10,\r\n\t\"send_interval_sec\": 300,\r\n\t\"watering_interval_sec\": null,\r\n\t\"max_temp\": 30.2,\r\n\t\"min_temp\": 9.2,\r\n\t\"humidity\": {\r\n\t\t\"min\": 10,\r\n\t\t\"opt_min\": 30,\r\n\t\t\"opt_max\": 60,\r\n\t\t\"max\": 90\r\n\t},\r\n\t\"illuminance\": \"low\"\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"

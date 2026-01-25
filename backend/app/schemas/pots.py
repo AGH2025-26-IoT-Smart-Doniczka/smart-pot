@@ -1,5 +1,5 @@
 from pydantic import BaseModel, field_validator, model_validator
-from typing import Literal
+from typing import Literal, Optional
 
 class WaterPlantRequest(BaseModel):
    duration: int  # Duration in seconds
@@ -35,17 +35,34 @@ class HumidityRange(BaseModel):
         return self
 
 class ConfigChangeRequest(BaseModel):
-    sleep_interval_sec: int
+    pot_name: Optional[str] = None
+    measure_interval_sec: int
+    send_interval_sec: int
+    watering_interval_sec: Optional[int] = None
     max_temp: float
     min_temp: float
     humidity: HumidityRange
     illuminance: Literal["low", "medium", "high"]
 
-    @field_validator("sleep_interval_sec")
+    @field_validator("pot_name")
     @classmethod
-    def sleep_interval_positive(cls, v: int) -> int:
+    def pot_name_non_empty(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not v.strip():
+            raise ValueError("pot_name cannot be empty")
+        return v
+
+    @field_validator("measure_interval_sec", "send_interval_sec")
+    @classmethod
+    def interval_positive(cls, v: int) -> int:
         if v <= 0:
-            raise ValueError("sleep_interval_sec must be > 0")
+            raise ValueError("intervals must be > 0")
+        return v
+
+    @field_validator("watering_interval_sec")
+    @classmethod
+    def watering_interval_positive(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and v <= 0:
+            raise ValueError("watering_interval_sec must be > 0")
         return v
 
     @field_validator("min_temp", "max_temp")
@@ -60,6 +77,29 @@ class ConfigChangeRequest(BaseModel):
         if self.min_temp >= self.max_temp:
             raise ValueError("min_temp must be < max_temp")
         return self
+
+
+class PotConfigResponse(BaseModel):
+    pot_name: str
+    measure_interval_sec: int
+    send_interval_sec: int
+    watering_interval_sec: Optional[int] = None
+    max_temp: float
+    min_temp: float
+    humidity: HumidityRange
+    illuminance: Literal["low", "medium", "high"]
+
+
+class PotListItemResponse(BaseModel):
+    pot_id: str
+    user_id: str
+    name: str
+    last_measure: dict | None
+    config: PotConfigResponse
+
+
+class PotListResponse(BaseModel):
+    pots: list[PotListItemResponse]
 
 
 class ChangeOwnerRequest(BaseModel):

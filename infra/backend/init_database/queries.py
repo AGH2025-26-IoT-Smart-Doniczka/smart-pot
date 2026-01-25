@@ -16,7 +16,10 @@ queries = [
     """
     CREATE TABLE IF NOT EXISTS pots (
         pot_id TEXT PRIMARY KEY,
+        pot_name TEXT,
         measure_interval_sec INTEGER DEFAULT 300,
+        send_interval_sec INTEGER DEFAULT 300,
+        watering_interval_sec INTEGER,
         max_temperature NUMERIC(4,1) DEFAULT 30.0,
         min_temperature NUMERIC(4,1) DEFAULT 10.0,
         humidity_thresholds JSONB DEFAULT '{
@@ -28,6 +31,16 @@ queries = [
         illuminance_type INTEGER DEFAULT 1,
         is_watering BOOLEAN DEFAULT FALSE
     )
+    """,
+    """
+    UPDATE pots
+    SET pot_name = pot_id
+    WHERE pot_name IS NULL;
+    """,
+    """
+    UPDATE pots
+    SET send_interval_sec = measure_interval_sec
+    WHERE send_interval_sec IS NULL;
     """,
     """
     CREATE TABLE IF NOT EXISTS connections (

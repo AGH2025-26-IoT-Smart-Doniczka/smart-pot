@@ -115,12 +115,12 @@ def insert_pot(pot_id: str) -> dict[str, Any] | None:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     """
-                    INSERT INTO pots (pot_id)
-                    VALUES (%s)
+                    INSERT INTO pots (pot_id, pot_name)
+                    VALUES (%s, %s)
                     ON CONFLICT DO NOTHING
                     RETURNING *;
                     """,
-                    (pot_id,),
+                    (pot_id, pot_id),
                 )
                 inserted_row = cur.fetchone()
                 print(f"[insert_pot] Inserted new pot with id={pot_id}")
@@ -259,6 +259,7 @@ def update_config(pot_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
                 """
                 UPDATE pots
                 SET
+                    pot_name = COALESCE(%(pot_name)s, pot_name),
                     max_temperature = %(max_temp)s,
                     min_temperature = %(min_temp)s,
                     humidity_thresholds = jsonb_build_object(
@@ -268,12 +269,15 @@ def update_config(pot_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
                         'very_high', %(humidity_max)s
                     ),
                     illuminance_type = %(illuminance)s,
-                    measure_interval_sec = %(interval_sec)s
+                    measure_interval_sec = %(measure_interval_sec)s,
+                    send_interval_sec = %(send_interval_sec)s,
+                    watering_interval_sec = %(watering_interval_sec)s
                 WHERE pot_id = %(pot_id)s
                 RETURNING *;
                 """,
                 {
                     "pot_id": pot_id,
+                    "pot_name": data.get("pot_name"),
                     "max_temp": data["max_temp"],
                     "min_temp": data["min_temp"],
                     "humidity_min": data["humidity"]["min"],
@@ -281,7 +285,9 @@ def update_config(pot_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
                     "humidity_opt_max": data["humidity"]["opt_max"],
                     "humidity_max": data["humidity"]["max"],
                     "illuminance": data["illuminance"],
-                    "interval_sec": data["sleep_interval_sec"],
+                    "measure_interval_sec": data["measure_interval_sec"],
+                    "send_interval_sec": data["send_interval_sec"],
+                    "watering_interval_sec": data.get("watering_interval_sec"),
                 },
             )
             return cur.fetchone()
@@ -328,6 +334,14 @@ def get_user_pots(user_id: str) -> list[dict[str, Any]]:
                 """
                 SELECT
                     p.pot_id,
+                    p.pot_name,
+                    p.measure_interval_sec,
+                    p.send_interval_sec,
+                    p.watering_interval_sec,
+                    p.max_temperature,
+                    p.min_temperature,
+                    p.humidity_thresholds,
+                    p.illuminance_type,
                     c.user_id,
                     m.timestamp,
                     m.air_temp,
@@ -374,7 +388,17 @@ def get_user_pots(user_id: str) -> list[dict[str, Any]]:
                     {
                         "pot_id": row["pot_id"],
                         "user_id": row["user_id"],
-                        "name": row["pot_id"],
+                        "name": row["pot_name"] or row["pot_id"],
+                        "config": {
+                            "pot_name": row["pot_name"] or row["pot_id"],
+                            "measure_interval_sec": row["measure_interval_sec"],
+                            "send_interval_sec": row["send_interval_sec"],
+                            "watering_interval_sec": row["watering_interval_sec"],
+                            "max_temp": row["max_temperature"],
+                            "min_temp": row["min_temperature"],
+                            "humidity": row["humidity_thresholds"],
+                            "illuminance": row["illuminance_type"],
+                        },
                         "last_measure": last_measure,
                     }
                 )

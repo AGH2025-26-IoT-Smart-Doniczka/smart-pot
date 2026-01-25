@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:smart_pot_mobile_app/data/pots_controller.dart';
 import 'package:smart_pot_mobile_app/models/pot_data.dart';
 
 class PotConfigScreen extends StatefulWidget {
@@ -18,11 +20,20 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
   final TextEditingController _sendPeriodController = TextEditingController();
   final TextEditingController _wateringPeriodController = TextEditingController();
   bool _autoWateringEnabled = false;
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.pot.name);
+    _measurementPeriodController.text =
+        widget.pot.config.measureIntervalSec.toString();
+    _sendPeriodController.text = widget.pot.config.sendIntervalSec.toString();
+    if (widget.pot.config.wateringIntervalSec != null) {
+      _autoWateringEnabled = true;
+      _wateringPeriodController.text =
+          widget.pot.config.wateringIntervalSec.toString();
+    }
   }
 
   @override
@@ -34,15 +45,50 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
     super.dispose();
   }
 
-  void _saveConfiguration() {
+  Future<void> _saveConfiguration() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Konfiguracja zapisana.')),
+    final measureInterval =
+        int.tryParse(_measurementPeriodController.text.trim()) ?? 0;
+    final sendInterval =
+        int.tryParse(_sendPeriodController.text.trim()) ?? 0;
+    final wateringInterval = _autoWateringEnabled
+        ? int.tryParse(_wateringPeriodController.text.trim())
+        : null;
+
+    final payload = widget.pot.config.toApiJson(
+      overrideName: _nameController.text.trim(),
     );
-    Navigator.of(context).pop();
+    payload['measure_interval_sec'] = measureInterval;
+    payload['send_interval_sec'] = sendInterval;
+    payload['watering_interval_sec'] = wateringInterval;
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      await context
+          .read<PotsController>()
+          .updatePotConfig(widget.pot.potId, payload);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Konfiguracja zapisana.')),
+      );
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Nie udało się zapisać konfiguracji: $e')),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isSaving = false;
+      });
+    }
   }
 
   @override
@@ -157,9 +203,9 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
               ),
               const SizedBox(height: 24),
               FilledButton.icon(
-                onPressed: _saveConfiguration,
+                onPressed: _isSaving ? null : _saveConfiguration,
                 icon: const Icon(Icons.save),
-                label: const Text('Zapisz konfigurację'),
+                label: Text(_isSaving ? 'Zapisywanie...' : 'Zapisz konfigurację'),
               ),
             ],
           ),
