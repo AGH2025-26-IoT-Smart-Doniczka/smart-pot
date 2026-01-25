@@ -13,27 +13,6 @@ class PairingRequest(BaseModel):
     user_id: str
 
 
-class HumidityRange(BaseModel):
-    min: int
-    opt_min: int
-    opt_max: int
-    max: int
-
-    @field_validator("min", "opt_min", "opt_max", "max")
-    @classmethod
-    def humidity_non_negative(cls, v: int) -> int:
-        if v < 0 or v > 100:
-            raise ValueError("Humidity must be between 0 and 100")
-        return v
-
-    @model_validator(mode="after")
-    def check_order(self):
-        if not (self.min <= self.opt_min <= self.opt_max <= self.max):
-            raise ValueError(
-                "Humidity values must satisfy: min ≤ opt_min ≤ opt_max ≤ max"
-            )
-        return self
-
 class ConfigChangeRequest(BaseModel):
     pot_name: Optional[str] = None
     measure_interval_sec: int
@@ -41,7 +20,8 @@ class ConfigChangeRequest(BaseModel):
     watering_interval_sec: Optional[int] = None
     max_temp: float
     min_temp: float
-    humidity: HumidityRange
+    min_moisture: int
+    max_moisture: int
     illuminance: Literal["low", "medium", "high"]
 
     @field_validator("pot_name")
@@ -78,6 +58,19 @@ class ConfigChangeRequest(BaseModel):
             raise ValueError("min_temp must be < max_temp")
         return self
 
+    @field_validator("min_moisture", "max_moisture")
+    @classmethod
+    def moisture_in_range(cls, v: int) -> int:
+        if v < 0 or v > 100:
+            raise ValueError("Moisture must be between 0 and 100")
+        return v
+
+    @model_validator(mode="after")
+    def check_moisture_order(self):
+        if self.min_moisture > self.max_moisture:
+            raise ValueError("min_moisture must be <= max_moisture")
+        return self
+
 
 class PotConfigResponse(BaseModel):
     pot_name: str
@@ -86,7 +79,8 @@ class PotConfigResponse(BaseModel):
     watering_interval_sec: Optional[int] = None
     max_temp: float
     min_temp: float
-    humidity: HumidityRange
+    min_moisture: int
+    max_moisture: int
     illuminance: Literal["low", "medium", "high"]
 
 

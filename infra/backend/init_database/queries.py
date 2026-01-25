@@ -7,7 +7,7 @@ queries = [
     """,
     """
     CREATE TABLE IF NOT EXISTS users (
-        user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         email TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
         username TEXT NOT NULL
@@ -17,19 +17,14 @@ queries = [
     CREATE TABLE IF NOT EXISTS pots (
         pot_id TEXT PRIMARY KEY,
         pot_name TEXT,
-        measure_interval_sec INTEGER DEFAULT 300,
-        send_interval_sec INTEGER DEFAULT 300,
+        measure_interval_sec INTEGER NOT NULL DEFAULT 300,
+        send_interval_sec INTEGER NOT NULL DEFAULT 300,
         watering_interval_sec INTEGER,
-        max_temperature NUMERIC(4,1) DEFAULT 30.0,
         min_temperature NUMERIC(4,1) DEFAULT 10.0,
-        humidity_thresholds JSONB DEFAULT '{
-                "very_low": 10,
-                "low": 35,
-                "high": 60,
-                "very_high": 90
-            }'::jsonb,
-        illuminance_type INTEGER DEFAULT 1,
-        is_watering BOOLEAN DEFAULT FALSE
+        max_temperature NUMERIC(4,1) DEFAULT 30.0,
+        min_moisture INTEGER DEFAULT 0,
+        max_moisture INTEGER DEFAULT 100,
+        illuminance_type INTEGER DEFAULT 1
     )
     """,
     """
@@ -44,21 +39,19 @@ queries = [
     """,
     """
     CREATE TABLE IF NOT EXISTS connections (
-        user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-        pot_id TEXT NOT NULL REFERENCES pots(pot_id) ON DELETE CASCADE,
-        is_active BOOLEAN DEFAULT TRUE,
-        is_admin BOOLEAN DEFAULT TRUE,
-        is_owner BOOLEAN DEFAULT TRUE,
+        user_id UUID NOT NULL REFERENCES users(user_id),
+        pot_id TEXT NOT NULL REFERENCES pots(pot_id),
+        role TEXT DEFAULT 'VIEWER',
         PRIMARY KEY (user_id, pot_id)
     )
     """,
     """
     CREATE TABLE IF NOT EXISTS measures (
-        pot_id TEXT NOT NULL REFERENCES pots(pot_id) ON DELETE CASCADE,
+        pot_id TEXT NOT NULL REFERENCES pots(pot_id),
         timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        air_temp NUMERIC(4,1),
+        air_temp REAL,
         air_pressure INTEGER,
-        soil_moisture NUMERIC(4,1),
+        soil_moisture INTEGER,
         illuminance INTEGER,
         PRIMARY KEY (pot_id, timestamp)
     )
@@ -66,6 +59,15 @@ queries = [
     """
     CREATE UNIQUE INDEX IF NOT EXISTS one_owner_per_pot
     ON connections (pot_id)
-    WHERE is_owner = TRUE;
+    WHERE role = 'OWNER';
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS pot_logs (
+        id SERIAL PRIMARY KEY,
+        pot_id TEXT NOT NULL REFERENCES pots(pot_id),
+		timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        label TEXT,
+        payload JSONB
+    )
     """,
 ]
