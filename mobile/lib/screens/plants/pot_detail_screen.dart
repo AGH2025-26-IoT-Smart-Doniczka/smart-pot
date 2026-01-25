@@ -38,8 +38,8 @@ class PotDetailScreen extends StatelessWidget {
                 gradient: LinearGradient(
                   colors: hasMeasurement
                       ? (isHappy
-                          ? [Colors.green.shade300, Colors.green.shade500]
-                          : [Colors.orange.shade300, Colors.orange.shade500])
+                            ? [Colors.green.shade300, Colors.green.shade500]
+                            : [Colors.orange.shade300, Colors.orange.shade500])
                       : [Colors.grey.shade400, Colors.grey.shade600],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -47,16 +47,37 @@ class PotDetailScreen extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  Text(
-                    hasMeasurement ? (isHappy ? '🌿' : '🥀') : '🌱',
-                    style: const TextStyle(fontSize: 80),
+                  SizedBox(
+                    width: 160,
+                    child: AspectRatio(
+                      aspectRatio: 1.0,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(4),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 4,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Text(
+                            hasMeasurement ? (isHappy ? '🌿' : '🥀') : '🌱',
+                            style: const TextStyle(fontSize: 80),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     hasMeasurement
                         ? (isHappy
-                            ? 'Roślina czuje się świetnie!'
-                            : 'Roślina potrzebuje uwagi')
+                              ? 'Roślina czuje się świetnie!'
+                              : 'Roślina potrzebuje uwagi')
                         : 'Roślina czeka na pierwszy pomiar parametrów',
                     style: const TextStyle(
                       fontSize: 20,
@@ -107,9 +128,7 @@ class PotDetailScreen extends StatelessWidget {
                       ? _buildParametersGrid(context)
                       : Text(
                           'Brak pomiaru',
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyMedium
+                          style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(color: Colors.grey.shade500),
                         ),
                 ],
@@ -180,8 +199,7 @@ class PotDetailScreen extends StatelessWidget {
       _buildParameterCard(
         context,
         icon: Icons.water_drop,
-        iconColor:
-            pot.data.soilMoisture > 30 ? Colors.blue : Colors.orange,
+        iconColor: pot.data.soilMoisture > 30 ? Colors.blue : Colors.orange,
         title: 'Wilgotność gleby',
         value: '${pot.data.soilMoisture.toStringAsFixed(0)}%',
         description: _getSoilMoistureDescription(pot.data.soilMoisture),
@@ -203,8 +221,7 @@ class PotDetailScreen extends StatelessWidget {
             .clamp(1, cards.length)
             .toInt();
         final totalSpacing = spacing * (columns - 1);
-        final cardWidth =
-            (constraints.maxWidth - totalSpacing) / columns;
+        final cardWidth = (constraints.maxWidth - totalSpacing) / columns;
 
         return Wrap(
           spacing: spacing,
