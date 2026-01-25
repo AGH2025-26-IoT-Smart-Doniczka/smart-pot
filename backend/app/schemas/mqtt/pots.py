@@ -31,8 +31,10 @@ class TelemetryMqttMessage(BaseModel):
     data: TelemetryData
 
 
-class ConfigChangeMqttRequest(BaseModel): # not used yet (ヘ･_･)ヘ
-	lux: int
-	moi: list[int]
-	tem: list[float] 
-	sle: int
+class ConfigChangeMqttRequest(BaseModel):  # not used yet (ヘ･_･)ヘ
+    lux: int
+    moi: list[int]
+    tem: list[float]
+    mes: int
+    sen: int
+    wat: int | None

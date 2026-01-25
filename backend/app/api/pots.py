@@ -10,6 +10,7 @@ from ..schemas.pots import (
     PairingRequest,
     ConfigChangeRequest,
     ChangeOwnerRequest,
+    PotListResponse,
 )
 from ..integrations.mqtt.MQTTClient import MQTTClient
 from ..schemas.mqtt.pots import WaterPlantMqttRequest, AddUserRequest
@@ -79,7 +80,40 @@ def list_user_pots(authorization: str | None = Header(default=None)):
         )
 
     pots = get_user_pots(user_id)
-    return {"pots": json_safe(pots)}
+
+    ILLUMINANCE_REVERSE = {
+        0: "low",
+        1: "medium",
+        2: "high",
+    }
+
+    mapped = []
+    for pot in pots:
+        cfg = pot.get("config", {})
+        humidity = cfg.get("humidity") or {}
+        mapped.append(
+            {
+                **pot,
+                "config": {
+                    "pot_name": cfg.get("pot_name") or pot.get("name") or pot.get("pot_id"),
+                    "measure_interval_sec": cfg.get("measure_interval_sec") or 0,
+                    "send_interval_sec": cfg.get("send_interval_sec") or 0,
+                    "watering_interval_sec": cfg.get("watering_interval_sec"),
+                    "max_temp": cfg.get("max_temp"),
+                    "min_temp": cfg.get("min_temp"),
+                    "humidity": {
+                        "min": humidity.get("very_low") or 0,
+                        "opt_min": humidity.get("low") or 0,
+                        "opt_max": humidity.get("high") or 0,
+                        "max": humidity.get("very_high") or 0,
+                    },
+                    "illuminance": ILLUMINANCE_REVERSE.get(cfg.get("illuminance"), "medium"),
+                },
+            }
+        )
+
+    response = PotListResponse(pots=mapped)
+    return response.model_dump()
 
 
 @router.post("/{pot_id}/pairing", status_code=status.HTTP_201_CREATED)
@@ -217,7 +251,9 @@ def config_change(pot_id: str, data: ConfigChangeRequest):
                 updated["min_temperature"],
                 updated["max_temperature"],
             ],
-            "sle": updated["measure_interval_sec"],
+            "mes": updated["measure_interval_sec"],
+            "sen": updated["send_interval_sec"],
+            "wat": updated["watering_interval_sec"],
         }
     )
 
@@ -226,7 +262,7 @@ def config_change(pot_id: str, data: ConfigChangeRequest):
 
     try:
         topic = f"devices/{pot_id}/config/cmd"
-        mqtt_client.publish(topic, new_config, qos=1)
+        mqtt_client.publish(topic, new_config, qos=1, retain=True)
     finally:
         mqtt_client.disconnect()
 

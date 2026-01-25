@@ -10,6 +10,8 @@ class PotDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasMeasurement = pot.timeStamp != 'Time not specified';
     final isHappy = hasMeasurement && pot.data.soilMoisture > 30;
+    final measureInterval = pot.config.measureIntervalSec;
+    final sendInterval = pot.config.sendIntervalSec;
 
     return Scaffold(
       appBar: AppBar(
@@ -54,7 +56,7 @@ class PotDetailScreen extends StatelessWidget {
                       child: Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(24),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withValues(alpha: 0.1),
@@ -97,13 +99,13 @@ class PotDetailScreen extends StatelessWidget {
                       _buildConfigInfoChip(
                         context,
                         icon: Icons.sensors,
-                        label: '60 s',
+                        label: '${measureInterval.toString()} s',
                       ),
                       const SizedBox(width: 12),
                       _buildConfigInfoChip(
                         context,
                         icon: Icons.cloud_upload,
-                        label: '300 s',
+                        label: '${sendInterval.toString()} s',
                       ),
                     ],
                   ),
