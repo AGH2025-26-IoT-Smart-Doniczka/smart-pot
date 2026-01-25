@@ -35,12 +35,17 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
       TextEditingController();
   final TextEditingController _wateringSecondsController =
       TextEditingController();
+  final TextEditingController _minTempController = TextEditingController();
+  final TextEditingController _maxTempController = TextEditingController();
+  final TextEditingController _minMoistureController = TextEditingController();
+  final TextEditingController _maxMoistureController = TextEditingController();
   int _measurementIntervalSec = 0;
   int _sendIntervalSec = 0;
   int _wateringIntervalSec = 0;
   bool _autoWateringEnabled = false;
   bool _isSaving = false;
   bool _isDisconnecting = false;
+  String _illuminance = 'medium';
 
   @override
   void initState() {
@@ -75,6 +80,11 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
         secs: _wateringSecondsController,
       );
     }
+    _minTempController.text = widget.pot.config.minTemp.toString();
+    _maxTempController.text = widget.pot.config.maxTemp.toString();
+    _minMoistureController.text = widget.pot.config.humidity.min.toString();
+    _maxMoistureController.text = widget.pot.config.humidity.max.toString();
+    _illuminance = widget.pot.config.illuminance;
   }
 
   @override
@@ -92,6 +102,10 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
     _wateringHoursController.dispose();
     _wateringMinutesController.dispose();
     _wateringSecondsController.dispose();
+    _minTempController.dispose();
+    _maxTempController.dispose();
+    _minMoistureController.dispose();
+    _maxMoistureController.dispose();
     super.dispose();
   }
 
@@ -100,18 +114,28 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
       return;
     }
 
+    final minTemp = double.parse(_minTempController.text.trim());
+    final maxTemp = double.parse(_maxTempController.text.trim());
+    final minMoisture = int.parse(_minMoistureController.text.trim());
+    final maxMoisture = int.parse(_maxMoistureController.text.trim());
     final measureInterval = _measurementIntervalSec;
     final sendInterval = _sendIntervalSec;
     final wateringInterval = _autoWateringEnabled
         ? _wateringIntervalSec
         : null;
 
-    final payload = widget.pot.config.toApiJson(
-      overrideName: _nameController.text.trim(),
-    );
-    payload['measure_interval_sec'] = measureInterval;
-    payload['send_interval_sec'] = sendInterval;
-    payload['watering_interval_sec'] = wateringInterval;
+    final trimmedName = _nameController.text.trim();
+    final payload = <String, dynamic>{
+      'pot_name': trimmedName.isEmpty ? null : trimmedName,
+      'measure_interval_sec': measureInterval,
+      'send_interval_sec': sendInterval,
+      'watering_interval_sec': wateringInterval,
+      'min_temp': minTemp,
+      'max_temp': maxTemp,
+      'min_moisture': minMoisture,
+      'max_moisture': maxMoisture,
+      'illuminance': _illuminance,
+    };
 
     setState(() {
       _isSaving = true;
@@ -192,11 +216,131 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
                   border: OutlineInputBorder(),
                 ),
                 textInputAction: TextInputAction.next,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Podaj nazwę doniczki.';
-                  }
-                  return null;
+                validator: (_) => null,
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _minTempController,
+                      decoration: const InputDecoration(
+                        labelText: 'Min. temperatura (°C)',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        signed: true,
+                        decimal: true,
+                      ),
+                      textInputAction: TextInputAction.next,
+                      validator: (value) {
+                        final parsed = double.tryParse(value?.trim() ?? '');
+                        if (parsed == null) {
+                          return 'Podaj minimalną temperaturę.';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _maxTempController,
+                      decoration: const InputDecoration(
+                        labelText: 'Maks. temperatura (°C)',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        signed: true,
+                        decimal: true,
+                      ),
+                      textInputAction: TextInputAction.next,
+                      validator: (value) {
+                        final parsed = double.tryParse(value?.trim() ?? '');
+                        if (parsed == null) {
+                          return 'Podaj maksymalną temperaturę.';
+                        }
+                        final minParsed =
+                            double.tryParse(_minTempController.text.trim());
+                        if (minParsed != null && parsed <= minParsed) {
+                          return 'Musi być większa od minimalnej.';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _minMoistureController,
+                      decoration: const InputDecoration(
+                        labelText: 'Min. wilgotność (%)',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.next,
+                      validator: (value) {
+                        final parsed = int.tryParse(value?.trim() ?? '');
+                        if (parsed == null) {
+                          return 'Podaj minimalną wilgotność.';
+                        }
+                        if (parsed < 0 || parsed > 100) {
+                          return 'Zakres 0-100.';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _maxMoistureController,
+                      decoration: const InputDecoration(
+                        labelText: 'Maks. wilgotność (%)',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.next,
+                      validator: (value) {
+                        final parsed = int.tryParse(value?.trim() ?? '');
+                        if (parsed == null) {
+                          return 'Podaj maksymalną wilgotność.';
+                        }
+                        if (parsed < 0 || parsed > 100) {
+                          return 'Zakres 0-100.';
+                        }
+                        final minParsed =
+                            int.tryParse(_minMoistureController.text.trim());
+                        if (minParsed != null && parsed < minParsed) {
+                          return 'Musi być >= minimalnej.';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: _illuminance,
+                decoration: const InputDecoration(
+                  labelText: 'Nasłonecznienie',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'low', child: Text('Niskie')),
+                  DropdownMenuItem(value: 'medium', child: Text('Średnie')),
+                  DropdownMenuItem(value: 'high', child: Text('Wysokie')),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() {
+                    _illuminance = value;
+                  });
                 },
               ),
               const SizedBox(height: 16),
