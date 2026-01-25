@@ -73,8 +73,9 @@ class _DeviceTreeState extends State<DeviceTree> {
       }
 
       final currentUser = context.read<AuthController>().currentUser;
-      if (currentUser == null)
+      if (currentUser == null) {
         throw Exception("Użytkownik nie jest zalogowany. ");
+      }
 
       final potId = _connectedDevice!.id.replaceAll(':', '');
       print(_connectedDevice!.id);
@@ -105,7 +106,7 @@ class _DeviceTreeState extends State<DeviceTree> {
 
       final bool isOwner = role == 'owner';
 
-      print("Status właściciela: ${isOwner}");
+      print("Status właściciela: $isOwner");
 
       if (await _connectedDevice!.isConnected == false) {
         await _connectedDevice!.connect();

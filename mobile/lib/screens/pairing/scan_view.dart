@@ -27,7 +27,7 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
 
   List<BleDevice> _connectedDevices = [];
   List<BleDevice> _bondedDevices = [];
-  List<BleDevice> _webDevices = [];
+  final List<BleDevice> _webDevices = [];
 
   @override
   void initState() {
@@ -80,7 +80,9 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
       debugPrint('Bonded devices: ${bonded.length}');
 
       final connectedIds = connected.map((d) => d.id).toSet();
-      final bondedOnly = bonded.where((d) => !connectedIds.contains(d.id)).toList();
+      final bondedOnly = bonded
+          .where((d) => !connectedIds.contains(d.id))
+          .toList();
 
       if (mounted) {
         setState(() {
@@ -290,12 +292,7 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
 
     return ListView(
       children: _webDevices
-          .map(
-            (device) => _buildKnownDeviceTile(
-              device,
-              isConnected: false,
-            ),
-          )
+          .map((device) => _buildKnownDeviceTile(device, isConnected: false))
           .toList(),
     );
   }
@@ -305,8 +302,8 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
     final name = res.device.name.isNotEmpty
         ? res.device.name
         : advName.isNotEmpty
-            ? advName
-            : res.device.id;
+        ? advName
+        : res.device.id;
 
     return ListTile(
       title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -340,10 +337,7 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
     );
   }
 
-  Widget _buildKnownDeviceTile(
-    BleDevice device, {
-    required bool isConnected,
-  }) {
+  Widget _buildKnownDeviceTile(BleDevice device, {required bool isConnected}) {
     final name = device.name.isNotEmpty ? device.name : device.id;
 
     return ListTile(
