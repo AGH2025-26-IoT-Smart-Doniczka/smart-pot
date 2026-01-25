@@ -8,6 +8,7 @@ class PotMiniCard extends StatelessWidget {
   final String title;
   final String imageUrl;
   final VoidCallback? onTap;
+  final bool hasMeasurement;
 
   const PotMiniCard({
     super.key,
@@ -15,6 +16,7 @@ class PotMiniCard extends StatelessWidget {
     required this.description,
     required this.title,
     required this.imageUrl,
+    required this.hasMeasurement,
     this.onTap,
   });
 
@@ -46,7 +48,10 @@ class PotMiniCard extends StatelessWidget {
                 padding: EdgeInsets.all(8),
                 child: Row(
                   children: [
-                    Text(statusEmoji, style: TextStyle(fontSize: 20)),
+                    Text(
+                      hasMeasurement ? statusEmoji : '🌱',
+                      style: TextStyle(fontSize: 20),
+                    ),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -86,7 +91,8 @@ class PotCard extends StatelessWidget {
     // Wyciągamy dane dla wygody
     final temp = pot.data.airTemp.toStringAsFixed(1);
     final moisture = pot.data.soilMoisture.toStringAsFixed(0);
-    final isHappy = pot.data.soilMoisture > 30;
+    final hasMeasurement = pot.timeStamp != 'Time not specified';
+    final isHappy = hasMeasurement && pot.data.soilMoisture > 30;
 
     return GestureDetector(
       onTap: () {
@@ -109,12 +115,16 @@ class PotCard extends StatelessWidget {
                 width: 60,
                 height: 60,
                 decoration: BoxDecoration(
-                  color: isHappy ? Colors.green.shade100 : Colors.orange.shade100,
+                  color: hasMeasurement
+                      ? (isHappy
+                          ? Colors.green.shade100
+                          : Colors.orange.shade100)
+                      : Colors.grey.shade300,
                   shape: BoxShape.circle,
                 ),
                 child: Center(
                   child: Text(
-                    isHappy ? '🌿' : '🥀',
+                    hasMeasurement ? (isHappy ? '🌿' : '🥀') : '🌱',
                     style: const TextStyle(fontSize: 30),
                   ),
                 ),
@@ -137,30 +147,42 @@ class PotCard extends StatelessWidget {
                 ),
               ),
               // Parametry po prawej
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.thermostat, size: 16, color: Colors.grey),
-                      const SizedBox(width: 4),
-                      Text("$temp°C"),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                          Icons.water_drop,
-                          size: 16,
-                          color: isHappy ? Colors.blue : Colors.orange
-                      ),
-                      const SizedBox(width: 4),
-                      Text("$moisture%"),
-                    ],
-                  ),
-                ],
-              )
+              hasMeasurement
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.thermostat,
+                              size: 16,
+                              color: Colors.grey,
+                            ),
+                            const SizedBox(width: 4),
+                            Text("$temp°C"),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.water_drop,
+                              size: 16,
+                              color: isHappy ? Colors.blue : Colors.orange,
+                            ),
+                            const SizedBox(width: 4),
+                            Text("$moisture%"),
+                          ],
+                        ),
+                      ],
+                    )
+                  : Text(
+                      'Brak pomiaru',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: Colors.grey.shade500),
+                    )
             ],
           ),
         ),

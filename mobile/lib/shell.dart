@@ -29,8 +29,8 @@ class _MainShellState extends State<MainShell> {
     final theme = context.watch<ThemeController>();
     return Scaffold(
       appBar: AppBar(
-        centerTitle: true,
         elevation: 2.0,
+        title: Text("SmartPot"),
         //ikony po prawej
         actions: [
           //tymaczasowo zmiana theme w pasku
@@ -67,7 +67,7 @@ class _MainShellState extends State<MainShell> {
         destinations: [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
-            label: "Dom",
+            label: "Strona główna",
             selectedIcon: Icon(Icons.home),
           ),
           NavigationDestination(
