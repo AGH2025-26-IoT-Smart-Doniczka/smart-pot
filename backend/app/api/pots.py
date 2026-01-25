@@ -96,9 +96,7 @@ def list_user_pots(authorization: str | None = Header(default=None)):
             {
                 **pot,
                 "config": {
-                    "pot_name": cfg.get("pot_name")
-                    or pot.get("name")
-                    or pot.get("pot_id"),
+                    "pot_name": cfg.get("pot_name") or pot.get("name") or pot.get("pot_id"),
                     "measure_interval_sec": cfg.get("measure_interval_sec") or 0,
                     "send_interval_sec": cfg.get("send_interval_sec") or 0,
                     "watering_interval_sec": cfg.get("watering_interval_sec"),
@@ -110,9 +108,7 @@ def list_user_pots(authorization: str | None = Header(default=None)):
                         "opt_max": humidity.get("high") or 0,
                         "max": humidity.get("very_high") or 0,
                     },
-                    "illuminance": ILLUMINANCE_REVERSE.get(
-                        cfg.get("illuminance"), "medium"
-                    ),
+                    "illuminance": ILLUMINANCE_REVERSE.get(cfg.get("illuminance"), "medium"),
                 },
             }
         )
@@ -284,8 +280,6 @@ def change_owner(pot_id: str, data: dict):
         update_owner_connection(pot_id=pot_id, new_owner_id=new_user_id)
     except SystemError as e:
         fail["reason"] = "Database error during owner change"
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=fail
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=fail)
 
     return {"changed": True, "newOwner": get_pot_owner_username(pot_id)}
