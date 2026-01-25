@@ -57,6 +57,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       itemCount: ctrl.pots.length,
                       itemBuilder: (context, index) {
                         final pot = ctrl.pots[index];
+                        final hasMeasurement =
+                            pot.timeStamp != 'Time not specified';
                         return Padding(
                           padding: EdgeInsets.only(
                             right: index == ctrl.pots.length - 1 ? 0 : 12,
@@ -66,10 +68,12 @@ class _HomeScreenState extends State<HomeScreen> {
                             statusEmoji: pot.data.soilMoisture < 30
                                 ? '⚠️'
                                 : '😊',
-                            description:
-                                "Temp: ${pot.data.airTemp.toStringAsFixed(1)}°C",
+                            description: hasMeasurement
+                                ? "Temp: ${pot.data.airTemp.toStringAsFixed(1)}°C"
+                                : "Brak pomiaru",
                             title: pot.potId,
                             imageUrl: "assets/images/test_pot.png",
+                            hasMeasurement: hasMeasurement,
                             onTap: () {
                               Navigator.push(
                                 context,

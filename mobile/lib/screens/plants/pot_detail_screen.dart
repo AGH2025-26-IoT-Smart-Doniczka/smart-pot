@@ -8,7 +8,8 @@ class PotDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isHappy = pot.data.soilMoisture > 30;
+    final hasMeasurement = pot.timeStamp != 'Time not specified';
+    final isHappy = hasMeasurement && pot.data.soilMoisture > 30;
 
     return Scaffold(
       appBar: AppBar(
@@ -35,9 +36,11 @@ class PotDetailScreen extends StatelessWidget {
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: isHappy
-                      ? [Colors.green.shade300, Colors.green.shade500]
-                      : [Colors.orange.shade300, Colors.orange.shade500],
+                  colors: hasMeasurement
+                      ? (isHappy
+                          ? [Colors.green.shade300, Colors.green.shade500]
+                          : [Colors.orange.shade300, Colors.orange.shade500])
+                      : [Colors.grey.shade400, Colors.grey.shade600],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -45,14 +48,16 @@ class PotDetailScreen extends StatelessWidget {
               child: Column(
                 children: [
                   Text(
-                    isHappy ? '🌿' : '🥀',
+                    hasMeasurement ? (isHappy ? '🌿' : '🥀') : '🌱',
                     style: const TextStyle(fontSize: 80),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    isHappy
-                        ? 'Roślina czuje się świetnie!'
-                        : 'Roślina potrzebuje uwagi',
+                    hasMeasurement
+                        ? (isHappy
+                            ? 'Roślina czuje się świetnie!'
+                            : 'Roślina potrzebuje uwagi')
+                        : 'Roślina czeka na pierwszy pomiar parametrów',
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -61,7 +66,7 @@ class PotDetailScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Ostatnia aktualizacja: ${pot.timeStamp}',
+                    'Ostatni pomiar: ${hasMeasurement ? pot.timeStamp : 'Brak'}',
                     style: const TextStyle(fontSize: 14, color: Colors.white70),
                   ),
                   const SizedBox(height: 16),
@@ -98,7 +103,15 @@ class PotDetailScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  _buildParametersGrid(context),
+                  hasMeasurement
+                      ? _buildParametersGrid(context)
+                      : Text(
+                          'Brak pomiaru',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(color: Colors.grey.shade500),
+                        ),
                 ],
               ),
             ),
