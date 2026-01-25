@@ -14,6 +14,14 @@ queries = [
     )
     """,
     """
+    DO $$
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'connection_role') THEN
+            CREATE TYPE connection_role AS ENUM ('OWNER', 'EDITOR', 'VIEWER');
+        END IF;
+    END $$;
+    """,
+    """
     CREATE TABLE IF NOT EXISTS pots (
         pot_id TEXT PRIMARY KEY,
         pot_name TEXT,
@@ -41,7 +49,7 @@ queries = [
     CREATE TABLE IF NOT EXISTS connections (
         user_id UUID NOT NULL REFERENCES users(user_id),
         pot_id TEXT NOT NULL REFERENCES pots(pot_id),
-        role TEXT DEFAULT 'VIEWER',
+        role connection_role DEFAULT 'VIEWER',
         PRIMARY KEY (user_id, pot_id)
     )
     """,

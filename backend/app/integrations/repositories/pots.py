@@ -5,6 +5,7 @@ from psycopg2 import IntegrityError
 from psycopg2.extras import RealDictCursor
 
 from ..db.client import get_connection
+from ...schemas.roles import ConnectionRole
 
 
 def pot_exists(pot_id: str) -> bool:
@@ -53,10 +54,10 @@ def pot_has_owner(pot_id: str) -> tuple[Any, ...] | None:
                     SELECT user_id
                     FROM connections
                     WHERE pot_id = %s
-                    AND role = 'OWNER'
+                    AND role = %s
                     LIMIT 1;
                     """,
-                (pot_id,),
+                (pot_id, ConnectionRole.OWNER.value),
             )
             return cur.fetchone()
 
@@ -70,10 +71,10 @@ def get_pot_owner_username(pot_id: str) -> str | None:
                     FROM connections c
                     JOIN users u ON c.user_id = u.user_id
                     WHERE c.pot_id = %s
-                      AND c.role = 'OWNER'
+                      AND c.role = %s
                     LIMIT 1;
                     """,
-                (pot_id,),
+                (pot_id, ConnectionRole.OWNER.value),
             )
             row = cur.fetchone()
             if row:
@@ -88,7 +89,7 @@ def insert_connection(pot_id: str, user_id: str, has_owner: bool) -> dict[str, A
     if not pot_exists(pot_id):
         insert_pot(pot_id)
 
-    role = "OWNER" if not has_owner else "VIEWER"
+    role = ConnectionRole.OWNER.value if not has_owner else ConnectionRole.VIEWER.value
 
     conn = get_connection()
     try:
@@ -275,21 +276,21 @@ def update_owner_connection(pot_id: str, new_owner_id: str) -> None:
                 cur.execute(
                     """
                     UPDATE connections
-                    SET role = 'VIEWER'
+                    SET role = %s
                     WHERE pot_id = %s;
                     """,
-                    (pot_id,),
+                    (ConnectionRole.VIEWER.value, pot_id),
                 )
 
                 cur.execute(
                     """
                     INSERT INTO connections (user_id, pot_id, role)
-                    VALUES (%s, %s, 'OWNER')
+                    VALUES (%s, %s, %s)
                     ON CONFLICT (user_id, pot_id)
                     DO UPDATE SET
                         role = EXCLUDED.role;
                     """,
-                    (new_owner_id, pot_id),
+                    (new_owner_id, pot_id, ConnectionRole.OWNER.value),
                 )
     except Exception:
         conn.rollback()
@@ -400,7 +401,7 @@ def delete_owner_connection(pot_id: str, user_id: str) -> str:
                 row = cur.fetchone()
                 if row is None:
                     return "not_found"
-                if row["role"] != "OWNER":
+                if row["role"] != ConnectionRole.OWNER.value:
                     return "forbidden"
 
                 cur.execute(
