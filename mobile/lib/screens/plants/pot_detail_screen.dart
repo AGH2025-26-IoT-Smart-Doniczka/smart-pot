@@ -98,66 +98,7 @@ class PotDetailScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-
-                  // Temperatura powietrza
-                  _buildParameterCard(
-                    context,
-                    icon: Icons.thermostat,
-                    iconColor: Colors.red,
-                    title: 'Temperatura powietrza',
-                    value: '${pot.data.airTemp.toStringAsFixed(1)}°C',
-                    description: _getTemperatureDescription(pot.data.airTemp),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Wilgotność powietrza
-                  _buildParameterCard(
-                    context,
-                    icon: Icons.water,
-                    iconColor: Colors.lightBlue,
-                    title: 'Wilgotność powietrza',
-                    value: '${pot.data.airHumidity.toStringAsFixed(1)}%',
-                    description: _getHumidityDescription(pot.data.airHumidity),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Ciśnienie
-                  _buildParameterCard(
-                    context,
-                    icon: Icons.compress,
-                    iconColor: Colors.purple,
-                    title: 'Ciśnienie',
-                    value: '${pot.data.airPressure.toStringAsFixed(1)} hPa',
-                    description: _getPressureDescription(pot.data.airPressure),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Wilgotność gleby
-                  _buildParameterCard(
-                    context,
-                    icon: Icons.water_drop,
-                    iconColor: pot.data.soilMoisture > 30
-                        ? Colors.blue
-                        : Colors.orange,
-                    title: 'Wilgotność gleby',
-                    value: '${pot.data.soilMoisture.toStringAsFixed(0)}%',
-                    description: _getSoilMoistureDescription(
-                      pot.data.soilMoisture,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Natężenie światła
-                  _buildParameterCard(
-                    context,
-                    icon: Icons.wb_sunny,
-                    iconColor: Colors.yellow,
-                    title: 'Natężenie światła',
-                    value: '${pot.data.illuminance.toStringAsFixed(0)} lx',
-                    description: _getIlluminanceDescription(
-                      pot.data.illuminance,
-                    ),
-                  ),
+                  _buildParametersGrid(context),
                 ],
               ),
             ),
@@ -191,6 +132,75 @@ class PotDetailScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildParametersGrid(BuildContext context) {
+    const double minCardWidth = 450;
+    const double spacing = 12;
+
+    final cards = [
+      _buildParameterCard(
+        context,
+        icon: Icons.thermostat,
+        iconColor: Colors.red,
+        title: 'Temperatura powietrza',
+        value: '${pot.data.airTemp.toStringAsFixed(1)}°C',
+        description: _getTemperatureDescription(pot.data.airTemp),
+      ),
+      _buildParameterCard(
+        context,
+        icon: Icons.water,
+        iconColor: Colors.lightBlue,
+        title: 'Wilgotność powietrza',
+        value: '${pot.data.airHumidity.toStringAsFixed(1)}%',
+        description: _getHumidityDescription(pot.data.airHumidity),
+      ),
+      _buildParameterCard(
+        context,
+        icon: Icons.compress,
+        iconColor: Colors.purple,
+        title: 'Ciśnienie',
+        value: '${pot.data.airPressure.toStringAsFixed(1)} hPa',
+        description: _getPressureDescription(pot.data.airPressure),
+      ),
+      _buildParameterCard(
+        context,
+        icon: Icons.water_drop,
+        iconColor:
+            pot.data.soilMoisture > 30 ? Colors.blue : Colors.orange,
+        title: 'Wilgotność gleby',
+        value: '${pot.data.soilMoisture.toStringAsFixed(0)}%',
+        description: _getSoilMoistureDescription(pot.data.soilMoisture),
+      ),
+      _buildParameterCard(
+        context,
+        icon: Icons.wb_sunny,
+        iconColor: Colors.yellow,
+        title: 'Natężenie światła',
+        value: '${pot.data.illuminance.toStringAsFixed(0)} lx',
+        description: _getIlluminanceDescription(pot.data.illuminance),
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = (constraints.maxWidth / minCardWidth)
+            .floor()
+            .clamp(1, cards.length)
+            .toInt();
+        final totalSpacing = spacing * (columns - 1);
+        final cardWidth =
+            (constraints.maxWidth - totalSpacing) / columns;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: cards
+              .map((card) => SizedBox(width: cardWidth, child: card))
+              .toList(),
+        );
+      },
     );
   }
 
