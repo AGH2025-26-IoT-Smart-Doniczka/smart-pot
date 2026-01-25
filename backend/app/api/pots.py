@@ -82,7 +82,6 @@ def get_user_id_from_auth(authorization: str | None) -> str:
     return user_id
 
 
-# split functionality into smaller functions later ( ﾉ ﾟｰﾟ)ﾉ
 @router.get("", status_code=status.HTTP_200_OK)
 def list_user_pots(authorization: str | None = Header(default=None)):
     user_id = get_user_id_from_auth(authorization)
@@ -115,6 +114,7 @@ def list_user_pots(authorization: str | None = Header(default=None)):
             }
         )
 
+    print(mapped)
     response = PotListResponse(pots=mapped)
     return response.model_dump()
 

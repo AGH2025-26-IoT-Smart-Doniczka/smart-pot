@@ -15,6 +15,7 @@ class SmartPotApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeController>();
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: "Smart Pot",
       initialRoute: AppRoutes.login,
       routes: {
