@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any
 
 from psycopg2 import IntegrityError
-from psycopg2.extras import RealDictCursor
+from psycopg2.extras import Json, RealDictCursor
 
 from ..db.client import get_connection
 from ...schemas.roles import ConnectionRole
@@ -173,6 +173,49 @@ def measures_insert(
                     inserted_row = cur.fetchone()
                     print(
                         f"[measures_insert] Inserted measures for pot_id={pot_id} at timestamp={timestamp}"
+                    )
+                    return inserted_row
+        finally:
+            conn.close()
+
+    except IntegrityError as e:
+        raise e
+
+
+def pot_logs_insert(
+    pot_id: str,
+    timestamp: float,
+    label: str,
+    payload: dict[str, Any],
+) -> dict[str, Any] | None:
+    try:
+        if not pot_exists(pot_id):
+            raise ValueError(f"Pot with id {pot_id} does not exist")
+        conn = get_connection()
+        try:
+            with conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute(
+                        """
+                        INSERT INTO pot_logs (
+                            pot_id,
+                            timestamp,
+                            label,
+                            payload
+                        )
+                        VALUES (
+                            %s,
+                            to_timestamp(%s),
+                            %s,
+                            %s
+                        )
+                        RETURNING *;
+                        """,
+                        (pot_id, timestamp, label, Json(payload)),
+                    )
+                    inserted_row = cur.fetchone()
+                    print(
+                        f"[pot_logs_insert] Inserted log for pot_id={pot_id} at timestamp={timestamp}"
                     )
                     return inserted_row
         finally:
