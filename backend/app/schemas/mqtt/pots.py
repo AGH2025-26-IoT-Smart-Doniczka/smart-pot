@@ -1,3 +1,4 @@
+from typing import Any
 from pydantic import BaseModel, conint, constr
 
 
@@ -20,11 +21,11 @@ class TelemetryMqttMessage(BaseModel):
 
 class ConfigChangeMqttRequest(BaseModel):
     lux: int
-    moi: list[int]
-    tem: list[float]
+    moi: tuple[int, int]
+    tem: tuple[float, float]
     mes: int
     sen: int
-    wat: int | None
+    wat: int
 
 
 class LogsMqttMessage(BaseModel):
@@ -34,10 +35,10 @@ class LogsMqttMessage(BaseModel):
     data: str
 
 
-class ActionMqttRequest(BaseModel):
-    typ: constr(min_length=1)
-    data: dict
-
-
 class WaterPlantMqttRequest(BaseModel):
     dur: int  # Duration in seconds
+
+
+class ActionMqttRequest(BaseModel):
+    typ: constr(min_length=1)
+    data: WaterPlantMqttRequest | dict[str, Any]
