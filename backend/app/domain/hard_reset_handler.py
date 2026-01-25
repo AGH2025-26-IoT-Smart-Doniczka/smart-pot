@@ -2,7 +2,7 @@ import logging
 import time
 from queue import Empty, Queue
 from threading import Lock
-from typing import Dict
+from typing import Any, Dict
 
 
 hard_reset_queues: Dict[str, Queue[dict]] = {}
@@ -27,11 +27,14 @@ def _drain_queue(queue: Queue[dict]) -> None:
             return
 
 
-def hard_reset_handler(topic: str, payload: dict):
+def hard_reset_handler(topic: str, payload: Any):
     pot_id = topic.split("/")[1]
     queue = _get_queue(pot_id)
     logger.info("hard reset received", extra={"pot_id": pot_id, "topic": topic, "payload": payload})
-    queue.put({"pot_id": pot_id, "timestamp": payload.get("timestamp")})
+    timestamp = None
+    if isinstance(payload, dict):
+        timestamp = payload.get("timestamp")
+    queue.put({"pot_id": pot_id, "timestamp": timestamp, "raw": payload})
 
 
 def wait_for_hard_reset(pot_id: str, timeout: float = 180.0) -> bool:

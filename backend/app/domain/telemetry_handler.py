@@ -55,7 +55,7 @@ def telemetry_worker() -> None:
             "telemetry parsed",
             extra={
                 "topic": topic,
-                "timestamp": data.timestamp,
+                "timestamp": data.ts,
                 "lux": data.data.lux,
                 "moi": data.data.moi,
                 "tem": data.data.tem,
@@ -67,7 +67,7 @@ def telemetry_worker() -> None:
         try:
             measures_insert(
                 pot_id=pot_id,
-                timestamp=data.timestamp,
+                timestamp=data.ts,
                 air_temp=data.data.tem,
                 air_pressure=data.data.pre,
                 soil_moisture=data.data.moi,

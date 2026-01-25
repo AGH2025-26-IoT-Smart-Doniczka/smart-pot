@@ -13,7 +13,7 @@ from ..schemas.pots import (
     PotListResponse,
 )
 from ..integrations.mqtt.MQTTClient import MQTTClient
-from ..schemas.mqtt.pots import WaterPlantMqttRequest, AddUserRequest
+from ..schemas.mqtt.pots import ActionMqttRequest, WaterPlantMqttRequest, AddUserRequest
 from ..integrations.repositories.pots import (
     pot_exists,
     user_exists,
@@ -188,8 +188,11 @@ def water_plant(pot_id: str, data: WaterPlantRequest):
     mqtt_client.connect()
 
     try:
-        topic = f"devices/{pot_id}/watering/cmd"
-        payload = WaterPlantMqttRequest(dur=data.duration).model_dump()
+        topic = f"devices/{pot_id}/actions"
+        payload = ActionMqttRequest(
+            typ="wtr",
+            data=WaterPlantMqttRequest(dur=data.duration).model_dump(),
+        ).model_dump()
         mqtt_client.publish(
             topic,
             payload,
@@ -261,7 +264,7 @@ def config_change(
     mqtt_client.connect()
 
     try:
-        topic = f"devices/{pot_id}/config/cmd"
+        topic = f"devices/{pot_id}/config"
         mqtt_client.publish(topic, new_config, qos=1, retain=True)
     finally:
         mqtt_client.disconnect()

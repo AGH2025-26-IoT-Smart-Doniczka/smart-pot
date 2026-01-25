@@ -171,11 +171,11 @@ class MQTTClient:
         _userdata: Any,
         message: mqtt_client.MQTTMessage,
     ) -> None:
+        raw_payload = message.payload.decode()
         try:
-            payload = json.loads(message.payload.decode())
+            payload = json.loads(raw_payload)
         except json.JSONDecodeError:
-            print(f"Invalid JSON on {message.topic}")
-            return
+            payload = raw_payload
 
         for pattern, (handler, _) in self.handlers.items():
             if mqtt_client.topic_matches_sub(pattern, message.topic):

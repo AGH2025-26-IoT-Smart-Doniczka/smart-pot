@@ -5,9 +5,8 @@ user mqtt-agent
 topic read users/add
 
 pattern write devices/%u/telemetry
-pattern write devices/%u/setup
-pattern write devices/%u/watering/status
+pattern write devices/%u/logs
 
-pattern read devices/%u/config/cmd
-pattern read devices/%u/watering/cmd
+pattern read devices/%u/config
+pattern read devices/%u/actions
 pattern read devices/%u/hard-reset

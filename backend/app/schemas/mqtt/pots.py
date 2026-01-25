@@ -1,19 +1,4 @@
-from pydantic import field_validator
 from pydantic import BaseModel, conint, constr
-
-
-class WaterPlantMqttRequest(BaseModel):
-    dur: int  # Duration in seconds
-
-
-class WateringStatusMqttResponse(BaseModel):
-    water: int
-
-    @field_validator("water")
-    def check_water(cls, v):
-        if v not in (0, 1):
-            raise ValueError(f"water must be 0 or 1, got {v}")
-        return v
 
 
 class AddUserRequest(BaseModel):
@@ -24,12 +9,12 @@ class AddUserRequest(BaseModel):
 class TelemetryData(BaseModel):
     lux: conint(ge=0)  # int >= 0
     tem: float
-    moi: conint(ge=0)
-    pre: float
+    moi: conint(ge=0, le=100)
+    pre: conint(ge=0)
 
 
 class TelemetryMqttMessage(BaseModel):
-    timestamp: float
+    ts: float
     data: TelemetryData
 
 
@@ -40,3 +25,19 @@ class ConfigChangeMqttRequest(BaseModel):
     mes: int
     sen: int
     wat: int | None
+
+
+class LogsMqttMessage(BaseModel):
+    ts: float
+    lab: constr(min_length=1)
+    lvl: conint(ge=1, le=4)
+    data: str
+
+
+class ActionMqttRequest(BaseModel):
+    typ: constr(min_length=1)
+    data: dict
+
+
+class WaterPlantMqttRequest(BaseModel):
+    dur: int  # Duration in seconds
