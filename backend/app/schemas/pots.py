@@ -127,6 +127,29 @@ class PotRenameRequest(BaseModel):
         return v
 
 
+class PotConfigResponse(BaseModel):
+    pot_name: str
+    measure_interval_sec: int
+    send_interval_sec: int
+    watering_interval_sec: Optional[int] = None
+    max_temp: float
+    min_temp: float
+    humidity: HumidityRange
+    illuminance: Literal["low", "medium", "high"]
+
+
+class PotListItemResponse(BaseModel):
+    pot_id: str
+    user_id: str
+    name: str
+    last_measure: dict | None
+    config: PotConfigResponse
+
+
+class PotListResponse(BaseModel):
+    pots: list[PotListItemResponse]
+
+
 class ChangeOwnerRequest(BaseModel):
     user_id: str
 
