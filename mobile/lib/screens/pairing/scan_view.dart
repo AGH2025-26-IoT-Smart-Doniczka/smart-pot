@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -100,29 +101,42 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
       return (granted: _isSupported, permanentlyDenied: false);
     }
 
-    final List<Permission> permissions;
+    if (Platform.isIOS) {
+      // iOS shows the Bluetooth prompt only when CoreBluetooth is used.
+      // permission_handler reports "permanentlyDenied" without showing a prompt,
+      // so skip requesting here and let the scan trigger the system dialog.
+      return (granted: true, permanentlyDenied: false);
+    } else if (await _needsLegacyBluetoothPermission()) {
+      final permissions = [Permission.bluetooth, Permission.locationWhenInUse];
+      final statuses = await permissions.request();
+      final allGranted = statuses.values.every((status) => status.isGranted);
+      final permanentlyDenied = statuses.values.any(
+        (status) => status.isPermanentlyDenied,
+      );
 
-    if (await _needsLegacyBluetoothPermission()) {
-      permissions = [Permission.bluetooth, Permission.locationWhenInUse];
+      if (!allGranted) {
+        debugPrint('Permissions denied: $statuses');
+      }
+
+      return (granted: allGranted, permanentlyDenied: permanentlyDenied);
     } else {
-      permissions = [
+      final permissions = [
         Permission.bluetoothScan,
         Permission.bluetoothConnect,
         Permission.locationWhenInUse,
       ];
+      final statuses = await permissions.request();
+      final allGranted = statuses.values.every((status) => status.isGranted);
+      final permanentlyDenied = statuses.values.any(
+        (status) => status.isPermanentlyDenied,
+      );
+
+      if (!allGranted) {
+        debugPrint('Permissions denied: $statuses');
+      }
+
+      return (granted: allGranted, permanentlyDenied: permanentlyDenied);
     }
-
-    final statuses = await permissions.request();
-    final allGranted = statuses.values.every((status) => status.isGranted);
-    final permanentlyDenied = statuses.values.any(
-      (status) => status.isPermanentlyDenied,
-    );
-
-    if (!allGranted) {
-      debugPrint('Permissions denied: $statuses');
-    }
-
-    return (granted: allGranted, permanentlyDenied: permanentlyDenied);
   }
 
   Future<void> _startScanning() async {
@@ -136,6 +150,7 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
 
   Future<bool> _needsLegacyBluetoothPermission() async {
     if (kIsWeb) return false;
+    if (!Platform.isAndroid) return false;
     final info = await DeviceInfoPlugin().androidInfo;
     return info.version.sdkInt < 31;
   }
