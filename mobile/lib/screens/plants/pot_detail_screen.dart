@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:smart_pot_mobile_app/data/pots_controller.dart';
 import 'package:smart_pot_mobile_app/models/pot_data.dart';
 import 'package:smart_pot_mobile_app/screens/plants/pot_config_screen.dart';
 
@@ -8,21 +10,29 @@ class PotDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasMeasurement = pot.timeStamp != 'Time not specified';
-    final isHappy = hasMeasurement && pot.data.soilMoisture > 30;
-    final measureInterval = pot.config.measureIntervalSec;
-    final sendInterval = pot.config.sendIntervalSec;
+    final currentPot = context.select<PotsController, Pot?>(
+      (ctrl) => ctrl.pots.firstWhere(
+        (p) => p.potId == pot.potId,
+        orElse: () => pot,
+      ),
+    );
+
+    final viewPot = currentPot ?? pot;
+    final hasMeasurement = viewPot.timeStamp != 'Time not specified';
+    final isHappy = hasMeasurement && viewPot.data.soilMoisture > 30;
+    final measureInterval = viewPot.config.measureIntervalSec;
+    final sendInterval = viewPot.config.sendIntervalSec;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(pot.name),
+        title: Text(viewPot.name),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () {
-              Navigator.of(context).push(
+            onPressed: () async {
+              await Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (context) => PotConfigScreen(pot: pot),
+                  builder: (context) => PotConfigScreen(pot: viewPot),
                 ),
               );
             },
@@ -89,7 +99,7 @@ class PotDetailScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Ostatni pomiar: ${hasMeasurement ? pot.timeStamp : 'Brak'}',
+                    'Ostatni pomiar: ${hasMeasurement ? viewPot.timeStamp : 'Brak'}',
                     style: const TextStyle(fontSize: 14, color: Colors.white70),
                   ),
                   const SizedBox(height: 16),
