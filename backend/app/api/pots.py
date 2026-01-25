@@ -25,6 +25,7 @@ from ..integrations.repositories.pots import (
     update_owner_connection,
     get_user_pots,
     delete_owner_connection,
+    user_has_write_role,
 )
 from ..domain.hard_reset_handler import wait_for_hard_reset
 from ..utils.jwt_token import decode_access_token
@@ -202,7 +203,18 @@ def water_plant(pot_id: str, data: WaterPlantRequest):
 
 
 @router.post("/{pot_id}/actions/config", status_code=status.HTTP_202_ACCEPTED)
-def config_change(pot_id: str, data: ConfigChangeRequest):
+def config_change(
+    pot_id: str,
+    data: ConfigChangeRequest,
+    authorization: str | None = Header(default=None),
+):
+    user_id = get_user_id_from_auth(authorization)
+    if not user_has_write_role(pot_id, user_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is not allowed to change configuration",
+        )
+
     ILLUMINANCE_MAP = {
         "low": 0,
         "medium": 1,
