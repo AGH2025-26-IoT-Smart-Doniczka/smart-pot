@@ -22,7 +22,8 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
   final TextEditingController _measurementPeriodController =
       TextEditingController();
   final TextEditingController _sendPeriodController = TextEditingController();
-  final TextEditingController _wateringPeriodController = TextEditingController();
+  final TextEditingController _wateringPeriodController =
+      TextEditingController();
   final TextEditingController _measureHoursController = TextEditingController();
   final TextEditingController _measureMinutesController =
       TextEditingController();
@@ -59,8 +60,9 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
     _nameController = TextEditingController(text: widget.pot.name);
     _measurementIntervalSec = widget.pot.config.measureIntervalSec;
     _sendIntervalSec = widget.pot.config.sendIntervalSec;
-    _measurementPeriodController.text =
-        _formatDurationForPicker(_measurementIntervalSec);
+    _measurementPeriodController.text = _formatDurationForPicker(
+      _measurementIntervalSec,
+    );
     _sendPeriodController.text = _formatDurationForPicker(_sendIntervalSec);
     _setWebFieldsFromSeconds(
       seconds: _measurementIntervalSec,
@@ -77,8 +79,9 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
     if (widget.pot.config.wateringIntervalSec != null) {
       _autoWateringEnabled = true;
       _wateringIntervalSec = widget.pot.config.wateringIntervalSec ?? 0;
-      _wateringPeriodController.text =
-          _formatDurationForPicker(_wateringIntervalSec);
+      _wateringPeriodController.text = _formatDurationForPicker(
+        _wateringIntervalSec,
+      );
       _setWebFieldsFromSeconds(
         seconds: _wateringIntervalSec,
         hours: _wateringHoursController,
@@ -131,9 +134,7 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
     final maxMoisture = int.parse(_maxMoistureController.text.trim());
     final measureInterval = _measurementIntervalSec;
     final sendInterval = _sendIntervalSec;
-    final wateringInterval = _autoWateringEnabled
-        ? _wateringIntervalSec
-        : null;
+    final wateringInterval = _autoWateringEnabled ? _wateringIntervalSec : null;
 
     final trimmedName = _nameController.text.trim();
     final payload = <String, dynamic>{
@@ -153,13 +154,14 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
     });
 
     try {
-      await context
-          .read<PotsController>()
-          .updatePotConfig(widget.pot.potId, payload);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Konfiguracja zapisana.')),
+      await context.read<PotsController>().updatePotConfig(
+        widget.pot.potId,
+        payload,
       );
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Konfiguracja zapisana.')));
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
@@ -174,8 +176,8 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
     }
   }
 
-  Future<void> _disconnectPot() async {
-    final shouldDisconnect = await _confirmDisconnect();
+  Future<void> _disconnectPot({required bool isOwner}) async {
+    final shouldDisconnect = await _confirmDisconnect(isOwner: isOwner);
     if (!shouldDisconnect) return;
     if (!mounted) return;
 
@@ -187,13 +189,25 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
       await context.read<PotsController>().disconnectPot(widget.pot.potId);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Doniczka została rozłączona.')),
+        SnackBar(
+          content: Text(
+            isOwner
+                ? 'Doniczka została usunięta i zresetowana.'
+                : 'Doniczka została rozłączona.',
+          ),
+        ),
       );
       Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Nie udało się rozłączyć: $e')),
+        SnackBar(
+          content: Text(
+            isOwner
+                ? 'Nie udało się usunąć doniczki: $e'
+                : 'Nie udało się rozłączyć: $e',
+          ),
+        ),
       );
     } finally {
       if (!mounted) return;
@@ -213,13 +227,13 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
       ),
     );
     final viewPot = currentPot ?? widget.pot;
-    final role = _resolveRole(viewPot, currentUserId);
+    final role = viewPot.role != PotRole.unknown
+        ? viewPot.role
+        : _resolveRole(viewPot, currentUserId);
 
     if (role == PotRole.viewer || role == PotRole.unknown) {
       return const Scaffold(
-        body: SafeArea(
-          child: Center(child: CircularProgressIndicator()),
-        ),
+        body: SafeArea(child: Center(child: CircularProgressIndicator())),
       );
     }
 
@@ -250,21 +264,27 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: FilledButton.icon(
-            onPressed: _isDisconnecting ? null : _disconnectPot,
+            onPressed: _isDisconnecting
+                ? null
+                : () => _disconnectPot(isOwner: isOwner),
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
               foregroundColor: Theme.of(context).colorScheme.onError,
             ),
             icon: const Icon(Icons.link_off),
             label: Text(
-              _isDisconnecting ? 'Rozłączanie...' : 'Rozłącz doniczkę',
+              _isDisconnecting
+                  ? (isOwner ? 'Usuwanie...' : 'Rozłączanie...')
+                  : (isOwner ? 'Usuń doniczkę' : 'Rozłącz doniczkę'),
             ),
           ),
         ),
       ),
     );
 
-    return isOwner ? DefaultTabController(length: 2, child: scaffold) : scaffold;
+    return isOwner
+        ? DefaultTabController(length: 2, child: scaffold)
+        : scaffold;
   }
 
   Widget _buildConfigurationForm(Pot pot) {
@@ -330,8 +350,9 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
                       if (parsed == null) {
                         return 'Podaj maksymalną temperaturę.';
                       }
-                      final minParsed =
-                          double.tryParse(_minTempController.text.trim());
+                      final minParsed = double.tryParse(
+                        _minTempController.text.trim(),
+                      );
                       if (minParsed != null && parsed <= minParsed) {
                         return 'Musi być większa od minimalnej.';
                       }
@@ -383,8 +404,9 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
                       if (parsed < 0 || parsed > 100) {
                         return 'Zakres 0-100.';
                       }
-                      final minParsed =
-                          int.tryParse(_minMoistureController.text.trim());
+                      final minParsed = int.tryParse(
+                        _minMoistureController.text.trim(),
+                      );
                       if (minParsed != null && parsed < minParsed) {
                         return 'Musi być >= minimalnej.';
                       }
@@ -495,8 +517,9 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
                       if (picked == null) return;
                       setState(() {
                         _sendIntervalSec = picked;
-                        _sendPeriodController.text =
-                            _formatDurationForPicker(picked);
+                        _sendPeriodController.text = _formatDurationForPicker(
+                          picked,
+                        );
                       });
                     },
                     textInputAction: TextInputAction.done,
@@ -511,7 +534,9 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Automatyczne podlewanie'),
-              subtitle: const Text('Włącz automatyczne uruchamianie podlewania.'),
+              subtitle: const Text(
+                'Włącz automatyczne uruchamianie podlewania.',
+              ),
               value: _autoWateringEnabled,
               onChanged: (value) {
                 setState(() {
@@ -627,17 +652,17 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
             DropdownButtonFormField<PotRole>(
               value: _newPermissionRole,
               decoration: const InputDecoration(
-                labelText: 'Rola',
+                labelText: 'Uprawnienia',
                 border: OutlineInputBorder(),
               ),
               items: const [
                 DropdownMenuItem(
                   value: PotRole.viewer,
-                  child: Text('Viewer'),
+                  child: Text('Tylko odczyt'),
                 ),
                 DropdownMenuItem(
                   value: PotRole.editor,
-                  child: Text('Editor'),
+                  child: Text('Odczyt i konfigurowanie'),
                 ),
               ],
               onChanged: (value) {
@@ -661,9 +686,9 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
             if (connections.isEmpty)
               Text(
                 'Brak dodatkowych użytkowników.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey.shade600,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade600),
               )
             else
               ...connections.map(
@@ -695,9 +720,7 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
     );
     if (existing) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Użytkownik już ma dostęp. Użyj edycji.'),
-        ),
+        const SnackBar(content: Text('Użytkownik już ma dostęp. Użyj edycji.')),
       );
       return;
     }
@@ -744,17 +767,17 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
                     ? PotRole.editor
                     : selectedRole,
                 decoration: const InputDecoration(
-                  labelText: 'Rola',
+                  labelText: 'Uprawnienia',
                   border: OutlineInputBorder(),
                 ),
                 items: const [
                   DropdownMenuItem(
                     value: PotRole.viewer,
-                    child: Text('Viewer'),
+                    child: Text('Tylko odczyt'),
                   ),
                   DropdownMenuItem(
                     value: PotRole.editor,
-                    child: Text('Editor'),
+                    child: Text('Odczyt i konfigurowanie'),
                   ),
                 ],
                 onChanged: (value) {
@@ -822,9 +845,9 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
       await context.read<PotsController>().fetchPots();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Nie udało się zmienić roli: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Nie udało się zmienić roli: $e')));
     } finally {
       if (!mounted) return;
       setState(() {
@@ -884,10 +907,12 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
   void _redirectIfViewer() {
     final currentUserId = context.read<AuthController>().currentUser?.id ?? '';
     final pot = context.read<PotsController>().pots.firstWhere(
-          (p) => p.potId == widget.pot.potId,
-          orElse: () => widget.pot,
-        );
-    final role = _resolveRole(pot, currentUserId);
+      (p) => p.potId == widget.pot.potId,
+      orElse: () => widget.pot,
+    );
+    final role = pot.role != PotRole.unknown
+        ? pot.role
+        : _resolveRole(pot, currentUserId);
     if (role == PotRole.viewer || role == PotRole.unknown) {
       Navigator.of(context).maybePop();
     }
@@ -907,7 +932,7 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
     return match.role;
   }
 
-  Future<bool> _confirmDisconnect() async {
+  Future<bool> _confirmDisconnect({required bool isOwner}) async {
     return await showDialog<bool>(
           context: context,
           builder: (dialogContext) {
@@ -915,19 +940,25 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
             return StatefulBuilder(
               builder: (context, setDialogState) {
                 return AlertDialog(
-                  title: const Text('Rozłączyć doniczkę?'),
+                  title: Text(
+                    isOwner ? 'Usunąć doniczkę?' : 'Rozłączyć doniczkę?',
+                  ),
                   content: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Ta operacja jest nieodwracalna. Doniczka zostanie odłączona od konta.',
+                      Text(
+                        isOwner
+                            ? 'Ta operacja jest nieodwracalna. Doniczka zostanie usunięta i zresetowana do ustawień fabrycznych.'
+                            : 'Ta operacja jest nieodwracalna. Doniczka zostanie odłączona od konta.',
                       ),
                       const SizedBox(height: 12),
                       CheckboxListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text(
-                          'Rozumiem, że tej operacji nie można cofnąć.',
+                        title: Text(
+                          isOwner
+                              ? 'Rozumiem, że to spowoduje twardy reset.'
+                              : 'Rozumiem, że tej operacji nie można cofnąć.',
                         ),
                         value: acknowledged,
                         onChanged: (value) {
@@ -947,7 +978,7 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
                       onPressed: acknowledged
                           ? () => Navigator.of(dialogContext).pop(true)
                           : null,
-                      child: const Text('Rozłącz'),
+                      child: Text(isOwner ? 'Usuń' : 'Rozłącz'),
                     ),
                   ],
                 );
@@ -999,7 +1030,8 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
                         const Spacer(),
                         TextButton(
                           onPressed: () {
-                            final total = (days * day) +
+                            final total =
+                                (days * day) +
                                 (hours * hour) +
                                 (minutes * minute) +
                                 seconds;
@@ -1016,8 +1048,7 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
                         label: 'd',
                         itemCount: 31,
                         initialItem: days,
-                        onChanged: (value) =>
-                            setModalState(() => days = value),
+                        onChanged: (value) => setModalState(() => days = value),
                       ),
                       _buildPickerColumn(
                         label: 'h',
@@ -1205,9 +1236,7 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
               padding: const EdgeInsets.only(top: 8),
               child: Text(
                 message,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.error,
-                ),
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
             );
           },
