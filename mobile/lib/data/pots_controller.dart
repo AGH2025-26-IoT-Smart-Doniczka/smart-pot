@@ -873,4 +873,27 @@ class PotsController extends ChangeNotifier {
 
     await fetchPots();
   }
+
+  Future<void> disconnectPot(String potId) async {
+    final user = _authController.currentUser;
+    if (user == null) {
+      throw Exception("Użytkownik nie jest zalogowany");
+    }
+
+    final url = Uri.parse('$_baseUrl/pots/$potId/pairing');
+    final response = await http.delete(
+      url,
+      headers: {
+        'Authorization': 'Bearer ${user.token}',
+      },
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception(
+        "Błąd rozłączania doniczki: ${response.statusCode}",
+      );
+    }
+
+    await fetchPots();
+  }
 }

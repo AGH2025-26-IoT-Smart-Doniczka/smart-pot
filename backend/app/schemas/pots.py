@@ -134,7 +134,8 @@ class PotConfigResponse(BaseModel):
     watering_interval_sec: Optional[int] = None
     max_temp: float
     min_temp: float
-    humidity: HumidityRange
+    min_moisture: int
+    max_moisture: int
     illuminance: Literal["low", "medium", "high"]
 
 

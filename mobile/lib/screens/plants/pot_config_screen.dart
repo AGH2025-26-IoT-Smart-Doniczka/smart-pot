@@ -794,6 +794,23 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
           ],
         ),
       ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: FilledButton.icon(
+            onPressed: _isDisconnecting ? null : _disconnectPot,
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            icon: const Icon(Icons.link_off),
+            label: Text(
+              _isDisconnecting ? 'Rozłączanie...' : 'Rozłącz doniczkę',
+            ),
+          ),
+        ),
+      ),
     );
   }
 
