@@ -415,3 +415,29 @@ def delete_owner_connection(pot_id: str, user_id: str) -> str:
                 return "deleted"
     finally:
         conn.close()
+
+
+def user_has_write_role(pot_id: str, user_id: str) -> bool:
+    conn = get_connection()
+    try:
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT role
+                    FROM connections
+                    WHERE pot_id = %s
+                      AND user_id = %s
+                    LIMIT 1;
+                    """,
+                    (pot_id, user_id),
+                )
+                row = cur.fetchone()
+                if row is None:
+                    return False
+                return row["role"] in (
+                    ConnectionRole.OWNER.value,
+                    ConnectionRole.EDITOR.value,
+                )
+    finally:
+        conn.close()
