@@ -175,10 +175,10 @@ def pot_has_owner(pot_id: str) -> tuple[Any, ...] | None:
                     SELECT user_id
                     FROM connections
                     WHERE pot_id = %s
-                    AND role = 'OWNER'
+                    AND role = %s
                     LIMIT 1;
                     """,
-                (pot_id,),
+                (pot_id, ConnectionRole.OWNER.value),
             )
             return cur.fetchone()
 
@@ -192,10 +192,10 @@ def get_pot_owner_username(pot_id: str) -> str | None:
                     FROM connections c
                     JOIN users u ON c.user_id = u.user_id
                     WHERE c.pot_id = %s
-                      AND c.role = 'OWNER'
+                      AND c.role = %s
                     LIMIT 1;
                     """,
-                (pot_id,),
+                (pot_id, ConnectionRole.OWNER.value),
             )
             row = cur.fetchone()
             if row:
