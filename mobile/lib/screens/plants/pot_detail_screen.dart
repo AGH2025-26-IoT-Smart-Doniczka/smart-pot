@@ -22,6 +22,7 @@ class PotDetailScreen extends StatelessWidget {
     final isHappy = hasMeasurement && viewPot.data.soilMoisture > 30;
     final measureInterval = viewPot.config.measureIntervalSec;
     final sendInterval = viewPot.config.sendIntervalSec;
+    final wateringInterval = viewPot.config.wateringIntervalSec;
 
     return Scaffold(
       appBar: AppBar(
@@ -109,14 +110,22 @@ class PotDetailScreen extends StatelessWidget {
                       _buildConfigInfoChip(
                         context,
                         icon: Icons.sensors,
-                        label: '${measureInterval.toString()} s',
+                        label: _formatInterval(measureInterval),
                       ),
                       const SizedBox(width: 12),
                       _buildConfigInfoChip(
                         context,
                         icon: Icons.cloud_upload,
-                        label: '${sendInterval.toString()} s',
+                        label: _formatInterval(sendInterval),
                       ),
+                      if (wateringInterval != null) ...[
+                        const SizedBox(width: 12),
+                        _buildConfigInfoChip(
+                          context,
+                          icon: Icons.water_drop,
+                          label: _formatInterval(wateringInterval),
+                        ),
+                      ],
                     ],
                   ),
                 ],
@@ -177,6 +186,24 @@ class PotDetailScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _formatInterval(int seconds) {
+    const int minute = 60;
+    const int hour = 60 * minute;
+    const int day = 24 * hour;
+
+    if (seconds < minute) return '${seconds}s';
+    if (seconds < hour) {
+      final minutes = seconds ~/ minute;
+      return '${minutes}m';
+    }
+    if (seconds < day) {
+      final hours = seconds ~/ hour;
+      return '${hours}h';
+    }
+    final days = seconds ~/ day;
+    return '${days}d';
   }
 
   Widget _buildParametersGrid(BuildContext context) {
