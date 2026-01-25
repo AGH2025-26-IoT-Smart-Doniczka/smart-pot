@@ -11,13 +11,13 @@ class PotDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currentPot = context.select<PotsController, Pot?>(
-      (ctrl) => ctrl.pots.firstWhere(
-        (p) => p.potId == pot.potId,
-        orElse: () => pot,
-      ),
+      (ctrl) =>
+          ctrl.pots.firstWhere((p) => p.potId == pot.potId, orElse: () => pot),
     );
 
     final viewPot = currentPot ?? pot;
+
+    final role = viewPot.role;
     final hasMeasurement = viewPot.timeStamp != 'Time not specified';
     final isHappy = hasMeasurement && viewPot.data.soilMoisture > 30;
     final measureInterval = viewPot.config.measureIntervalSec;
@@ -28,16 +28,17 @@ class PotDetailScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(viewPot.name),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => PotConfigScreen(pot: viewPot),
-                ),
-              );
-            },
-          ),
+          if (role == PotRole.editor || role == PotRole.owner)
+            IconButton(
+              icon: const Icon(Icons.settings),
+              onPressed: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => PotConfigScreen(pot: viewPot),
+                  ),
+                );
+              },
+            ),
         ],
       ),
       body: SingleChildScrollView(
@@ -221,14 +222,6 @@ class PotDetailScreen extends StatelessWidget {
       ),
       _buildParameterCard(
         context,
-        icon: Icons.water,
-        iconColor: Colors.lightBlue,
-        title: 'Wilgotność powietrza',
-        value: '${pot.data.airHumidity.toStringAsFixed(1)}%',
-        description: _getHumidityDescription(pot.data.airHumidity),
-      ),
-      _buildParameterCard(
-        context,
         icon: Icons.compress,
         iconColor: Colors.purple,
         title: 'Ciśnienie',
@@ -335,14 +328,6 @@ class PotDetailScreen extends StatelessWidget {
     if (temp < 25) return 'Optymalna temperatura';
     if (temp < 30) return 'Ciepło, ale w normie';
     return 'Za gorąco, rozważ przeniesienie';
-  }
-
-  String _getHumidityDescription(double humidity) {
-    if (humidity < 30) return 'Bardzo sucho';
-    if (humidity < 40) return 'Niska wilgotność';
-    if (humidity < 60) return 'Optymalna wilgotność';
-    if (humidity < 70) return 'Podwyższona wilgotność';
-    return 'Bardzo wysoka wilgotność';
   }
 
   String _getPressureDescription(double pressure) {

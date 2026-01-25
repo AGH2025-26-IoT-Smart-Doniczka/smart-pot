@@ -1,5 +1,6 @@
 from pydantic import BaseModel, field_validator, model_validator
 from typing import Literal, Optional
+from .roles import ConnectionRole
 
 class WaterPlantRequest(BaseModel):
    duration: int  # Duration in seconds
@@ -87,6 +88,7 @@ class PotConfigResponse(BaseModel):
 class PotListItemResponse(BaseModel):
     pot_id: str
     user_id: str
+    role: ConnectionRole
     name: str
     last_measure: dict | None
     config: PotConfigResponse

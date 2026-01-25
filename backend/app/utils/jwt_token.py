@@ -14,7 +14,7 @@ def create_access_token(user: dict):
         "sub": str(user["user_id"]),
         "email": user["email"],
         "username": user["username"],
-        "exp": int(expire.timestamp())
+        "exp": int(expire.timestamp()),
     }
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
     return token

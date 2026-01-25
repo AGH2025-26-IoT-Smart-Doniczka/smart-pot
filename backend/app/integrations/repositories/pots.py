@@ -318,6 +318,7 @@ def get_user_pots(user_id: str) -> list[dict[str, Any]]:
                         p.max_moisture,
                         p.illuminance_type,
                         c.user_id,
+                        c.role,
                         m.timestamp,
                         m.air_temp,
                         m.air_pressure,
@@ -362,6 +363,7 @@ def get_user_pots(user_id: str) -> list[dict[str, Any]]:
                         {
                             "pot_id": row["pot_id"],
                             "user_id": row["user_id"],
+                            "role": row["role"],
                             "name": row["pot_name"] or row["pot_id"],
                             "config": {
                                 "pot_name": row["pot_name"] or row["pot_id"],
