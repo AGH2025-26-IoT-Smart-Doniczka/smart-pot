@@ -883,17 +883,95 @@ class PotsController extends ChangeNotifier {
     final url = Uri.parse('$_baseUrl/pots/$potId/pairing');
     final response = await http.delete(
       url,
-      headers: {
-        'Authorization': 'Bearer ${user.token}',
-      },
+      headers: {'Authorization': 'Bearer ${user.token}'},
     );
 
     if (response.statusCode != 200 && response.statusCode != 204) {
-      throw Exception(
-        "Błąd rozłączania doniczki: ${response.statusCode}",
-      );
+      throw Exception("Błąd rozłączania doniczki: ${response.statusCode}");
     }
 
     await fetchPots();
+  }
+
+  Future<void> addPotConnection(
+    String potId, {
+    required String email,
+    required String role,
+  }) async {
+    final user = _authController.currentUser;
+    if (user == null) {
+      throw Exception("Użytkownik nie jest zalogowany");
+    }
+
+    final url = Uri.parse('$_baseUrl/pots/$potId/connections');
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${user.token}',
+      },
+      body: json.encode({'email': email, 'role': role}),
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception("Błąd dodawania dostępu: ${response.statusCode}");
+    }
+  }
+
+  Future<void> updatePotConnection(
+    String potId, {
+    required String connectionId,
+    required String email,
+    required String role,
+  }) async {
+    final user = _authController.currentUser;
+    if (user == null) {
+      throw Exception("Użytkownik nie jest zalogowany");
+    }
+
+    final url = connectionId.isNotEmpty
+        ? Uri.parse('$_baseUrl/pots/$potId/connections/$connectionId')
+        : Uri.parse('$_baseUrl/pots/$potId/connections');
+
+    final request = http.Request('PATCH', url);
+    request.headers.addAll({
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ${user.token}',
+    });
+    request.body = json.encode({'email': email, 'role': role});
+
+    final response = await request.send();
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception("Błąd aktualizacji dostępu: ${response.statusCode}");
+    }
+  }
+
+  Future<void> deletePotConnection(
+    String potId, {
+    required String connectionId,
+    required String email,
+  }) async {
+    final user = _authController.currentUser;
+    if (user == null) {
+      throw Exception("Użytkownik nie jest zalogowany");
+    }
+
+    final url = connectionId.isNotEmpty
+        ? Uri.parse('$_baseUrl/pots/$potId/connections/$connectionId')
+        : Uri.parse('$_baseUrl/pots/$potId/connections');
+
+    final request = http.Request('DELETE', url);
+    request.headers.addAll({
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ${user.token}',
+    });
+    if (connectionId.isEmpty) {
+      request.body = json.encode({'email': email});
+    }
+
+    final response = await request.send();
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception("Błąd usuwania dostępu: ${response.statusCode}");
+    }
   }
 }

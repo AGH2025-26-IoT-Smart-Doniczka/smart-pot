@@ -142,6 +142,7 @@ class PotConfigResponse(BaseModel):
 class PotListItemResponse(BaseModel):
     pot_id: str
     user_id: str
+    role: ConnectionRole
     name: str
     last_measure: dict | None
     config: PotConfigResponse

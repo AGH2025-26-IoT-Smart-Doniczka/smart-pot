@@ -132,6 +132,7 @@ def list_user_pots(authorization: str | None = Header(default=None)):
             }
         )
 
+    print(mapped)
     response = PotListResponse(pots=mapped)
     return response.model_dump()
 
