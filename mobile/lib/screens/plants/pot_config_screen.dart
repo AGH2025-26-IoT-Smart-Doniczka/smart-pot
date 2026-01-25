@@ -1,3 +1,5 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_pot_mobile_app/data/pots_controller.dart';
@@ -19,6 +21,23 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
       TextEditingController();
   final TextEditingController _sendPeriodController = TextEditingController();
   final TextEditingController _wateringPeriodController = TextEditingController();
+  final TextEditingController _measureHoursController = TextEditingController();
+  final TextEditingController _measureMinutesController =
+      TextEditingController();
+  final TextEditingController _measureSecondsController =
+      TextEditingController();
+  final TextEditingController _sendHoursController = TextEditingController();
+  final TextEditingController _sendMinutesController = TextEditingController();
+  final TextEditingController _sendSecondsController = TextEditingController();
+  final TextEditingController _wateringHoursController =
+      TextEditingController();
+  final TextEditingController _wateringMinutesController =
+      TextEditingController();
+  final TextEditingController _wateringSecondsController =
+      TextEditingController();
+  int _measurementIntervalSec = 0;
+  int _sendIntervalSec = 0;
+  int _wateringIntervalSec = 0;
   bool _autoWateringEnabled = false;
   bool _isSaving = false;
 
@@ -26,13 +45,34 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.pot.name);
+    _measurementIntervalSec = widget.pot.config.measureIntervalSec;
+    _sendIntervalSec = widget.pot.config.sendIntervalSec;
     _measurementPeriodController.text =
-        widget.pot.config.measureIntervalSec.toString();
-    _sendPeriodController.text = widget.pot.config.sendIntervalSec.toString();
+        _formatDurationForPicker(_measurementIntervalSec);
+    _sendPeriodController.text = _formatDurationForPicker(_sendIntervalSec);
+    _setWebFieldsFromSeconds(
+      seconds: _measurementIntervalSec,
+      hours: _measureHoursController,
+      minutes: _measureMinutesController,
+      secs: _measureSecondsController,
+    );
+    _setWebFieldsFromSeconds(
+      seconds: _sendIntervalSec,
+      hours: _sendHoursController,
+      minutes: _sendMinutesController,
+      secs: _sendSecondsController,
+    );
     if (widget.pot.config.wateringIntervalSec != null) {
       _autoWateringEnabled = true;
+      _wateringIntervalSec = widget.pot.config.wateringIntervalSec ?? 0;
       _wateringPeriodController.text =
-          widget.pot.config.wateringIntervalSec.toString();
+          _formatDurationForPicker(_wateringIntervalSec);
+      _setWebFieldsFromSeconds(
+        seconds: _wateringIntervalSec,
+        hours: _wateringHoursController,
+        minutes: _wateringMinutesController,
+        secs: _wateringSecondsController,
+      );
     }
   }
 
@@ -42,6 +82,15 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
     _measurementPeriodController.dispose();
     _sendPeriodController.dispose();
     _wateringPeriodController.dispose();
+    _measureHoursController.dispose();
+    _measureMinutesController.dispose();
+    _measureSecondsController.dispose();
+    _sendHoursController.dispose();
+    _sendMinutesController.dispose();
+    _sendSecondsController.dispose();
+    _wateringHoursController.dispose();
+    _wateringMinutesController.dispose();
+    _wateringSecondsController.dispose();
     super.dispose();
   }
 
@@ -50,12 +99,10 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
       return;
     }
 
-    final measureInterval =
-        int.tryParse(_measurementPeriodController.text.trim()) ?? 0;
-    final sendInterval =
-        int.tryParse(_sendPeriodController.text.trim()) ?? 0;
+    final measureInterval = _measurementIntervalSec;
+    final sendInterval = _sendIntervalSec;
     final wateringInterval = _autoWateringEnabled
-        ? int.tryParse(_wateringPeriodController.text.trim())
+        ? _wateringIntervalSec
         : null;
 
     final payload = widget.pot.config.toApiJson(
@@ -123,47 +170,99 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
                 },
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _measurementPeriodController,
-                decoration: const InputDecoration(
-                  labelText: 'Okres pomiaru (sekundy)',
-                  hintText: 'Np. 60',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.number,
-                textInputAction: TextInputAction.next,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Podaj okres pomiaru.';
-                  }
-                  final parsed = int.tryParse(value);
-                  if (parsed == null || parsed <= 0) {
-                    return 'Wpisz dodatnią liczbę sekund.';
-                  }
-                  return null;
-                },
-              ),
+              kIsWeb
+                  ? _buildWebDurationFields(
+                      label: 'Okres pomiaru',
+                      hoursController: _measureHoursController,
+                      minutesController: _measureMinutesController,
+                      secondsController: _measureSecondsController,
+                      onChanged: (value) {
+                        setState(() {
+                          _measurementIntervalSec = value;
+                        });
+                      },
+                      validator: () {
+                        if (_measurementIntervalSec <= 0) {
+                          return 'Podaj okres pomiaru.';
+                        }
+                        return null;
+                      },
+                    )
+                  : TextFormField(
+                      controller: _measurementPeriodController,
+                      decoration: const InputDecoration(
+                        labelText: 'Okres pomiaru',
+                        hintText: 'Wybierz czas',
+                        border: OutlineInputBorder(),
+                      ),
+                      readOnly: true,
+                      onTap: () async {
+                        final picked = await _showDurationPicker(
+                          context,
+                          initialSeconds: _measurementIntervalSec,
+                        );
+                        if (picked == null) return;
+                        setState(() {
+                          _measurementIntervalSec = picked;
+                          _measurementPeriodController.text =
+                              _formatDurationForPicker(picked);
+                        });
+                      },
+                      textInputAction: TextInputAction.next,
+                      validator: (_) {
+                        if (_measurementIntervalSec <= 0) {
+                          return 'Podaj okres pomiaru.';
+                        }
+                        return null;
+                      },
+                    ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _sendPeriodController,
-                decoration: const InputDecoration(
-                  labelText: 'Okres wysyłania (sekundy)',
-                  hintText: 'Np. 300',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.number,
-                textInputAction: TextInputAction.done,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Podaj okres wysyłania.';
-                  }
-                  final parsed = int.tryParse(value);
-                  if (parsed == null || parsed <= 0) {
-                    return 'Wpisz dodatnią liczbę sekund.';
-                  }
-                  return null;
-                },
-              ),
+              kIsWeb
+                  ? _buildWebDurationFields(
+                      label: 'Okres wysyłania',
+                      hoursController: _sendHoursController,
+                      minutesController: _sendMinutesController,
+                      secondsController: _sendSecondsController,
+                      onChanged: (value) {
+                        setState(() {
+                          _sendIntervalSec = value;
+                        });
+                      },
+                      validator: () {
+                        if (_sendIntervalSec <= 0) {
+                          return 'Podaj okres wysyłania.';
+                        }
+                        return null;
+                      },
+                    )
+                  : TextFormField(
+                      controller: _sendPeriodController,
+                      decoration: const InputDecoration(
+                        labelText: 'Okres wysyłania',
+                        hintText: 'Wybierz czas',
+                        border: OutlineInputBorder(),
+                      ),
+                      readOnly: true,
+                      onTap: () async {
+                        final picked = await _showDurationPicker(
+                          context,
+                          initialSeconds: _sendIntervalSec,
+                        );
+                        if (picked == null) return;
+                        setState(() {
+                          _sendIntervalSec = picked;
+                          _sendPeriodController.text =
+                              _formatDurationForPicker(picked);
+                        });
+                      },
+                      textInputAction: TextInputAction.done,
+                      validator: (_) {
+                        if (_sendIntervalSec <= 0) {
+                          return 'Podaj okres wysyłania.';
+                        }
+                        return null;
+                      },
+                    ),
               const SizedBox(height: 16),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
@@ -177,30 +276,62 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
                 },
               ),
               const SizedBox(height: 8),
-              TextFormField(
-                controller: _wateringPeriodController,
-                decoration: const InputDecoration(
-                  labelText: 'Okres podlewania (sekundy)',
-                  hintText: 'Np. 600',
-                  border: OutlineInputBorder(),
-                ),
-                enabled: _autoWateringEnabled,
-                keyboardType: TextInputType.number,
-                textInputAction: TextInputAction.done,
-                validator: (value) {
-                  if (!_autoWateringEnabled) {
-                    return null;
-                  }
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Podaj okres podlewania.';
-                  }
-                  final parsed = int.tryParse(value);
-                  if (parsed == null || parsed <= 0) {
-                    return 'Wpisz dodatnią liczbę sekund.';
-                  }
-                  return null;
-                },
-              ),
+              kIsWeb
+                  ? _buildWebDurationFields(
+                      label: 'Okres podlewania',
+                      hoursController: _wateringHoursController,
+                      minutesController: _wateringMinutesController,
+                      secondsController: _wateringSecondsController,
+                      enabled: _autoWateringEnabled,
+                      onChanged: (value) {
+                        setState(() {
+                          _wateringIntervalSec = value;
+                        });
+                      },
+                      validator: () {
+                        if (!_autoWateringEnabled) {
+                          return null;
+                        }
+                        if (_wateringIntervalSec <= 0) {
+                          return 'Podaj okres podlewania.';
+                        }
+                        return null;
+                      },
+                    )
+                  : TextFormField(
+                      controller: _wateringPeriodController,
+                      decoration: const InputDecoration(
+                        labelText: 'Okres podlewania',
+                        hintText: 'Wybierz czas',
+                        border: OutlineInputBorder(),
+                      ),
+                      enabled: _autoWateringEnabled,
+                      readOnly: true,
+                      onTap: _autoWateringEnabled
+                          ? () async {
+                              final picked = await _showDurationPicker(
+                                context,
+                                initialSeconds: _wateringIntervalSec,
+                              );
+                              if (picked == null) return;
+                              setState(() {
+                                _wateringIntervalSec = picked;
+                                _wateringPeriodController.text =
+                                    _formatDurationForPicker(picked);
+                              });
+                            }
+                          : null,
+                      textInputAction: TextInputAction.done,
+                      validator: (_) {
+                        if (!_autoWateringEnabled) {
+                          return null;
+                        }
+                        if (_wateringIntervalSec <= 0) {
+                          return 'Podaj okres podlewania.';
+                        }
+                        return null;
+                      },
+                    ),
               const SizedBox(height: 24),
               FilledButton.icon(
                 onPressed: _isSaving ? null : _saveConfiguration,
@@ -211,6 +342,264 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Future<int?> _showDurationPicker(
+    BuildContext context, {
+    required int initialSeconds,
+  }) async {
+    const int minute = 60;
+    const int hour = 60 * minute;
+    const int day = 24 * hour;
+
+    final initialDays = initialSeconds ~/ day;
+    final initialHours = (initialSeconds % day) ~/ hour;
+    final initialMinutes = (initialSeconds % hour) ~/ minute;
+    final initialSecs = initialSeconds % minute;
+
+    return showModalBottomSheet<int>(
+      context: context,
+      builder: (sheetContext) {
+        int days = initialDays;
+        int hours = initialHours;
+        int minutes = initialMinutes;
+        int seconds = initialSecs;
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Anuluj'),
+                        ),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: () {
+                            final total = (days * day) +
+                                (hours * hour) +
+                                (minutes * minute) +
+                                seconds;
+                            Navigator.of(context).pop(total);
+                          },
+                          child: const Text('Zapisz'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      _buildPickerColumn(
+                        label: 'd',
+                        itemCount: 31,
+                        initialItem: days,
+                        onChanged: (value) =>
+                            setModalState(() => days = value),
+                      ),
+                      _buildPickerColumn(
+                        label: 'h',
+                        itemCount: 24,
+                        initialItem: hours,
+                        onChanged: (value) =>
+                            setModalState(() => hours = value),
+                      ),
+                      _buildPickerColumn(
+                        label: 'm',
+                        itemCount: 60,
+                        initialItem: minutes,
+                        onChanged: (value) =>
+                            setModalState(() => minutes = value),
+                      ),
+                      _buildPickerColumn(
+                        label: 's',
+                        itemCount: 60,
+                        initialItem: seconds,
+                        onChanged: (value) =>
+                            setModalState(() => seconds = value),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildPickerColumn({
+    required String label,
+    required int itemCount,
+    required int initialItem,
+    required ValueChanged<int> onChanged,
+  }) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+          SizedBox(
+            height: 160,
+            child: CupertinoPicker(
+              itemExtent: 32,
+              scrollController: FixedExtentScrollController(
+                initialItem: initialItem.clamp(0, itemCount - 1),
+              ),
+              onSelectedItemChanged: onChanged,
+              children: List.generate(
+                itemCount,
+                (index) => Center(child: Text(index.toString())),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDurationForPicker(int seconds) {
+    const int minute = 60;
+    const int hour = 60 * minute;
+    const int day = 24 * hour;
+
+    final days = seconds ~/ day;
+    final hours = (seconds % day) ~/ hour;
+    final minutes = (seconds % hour) ~/ minute;
+    final secs = seconds % minute;
+
+    if (days > 0) {
+      return '${days}d ${hours}h ${minutes}m ${secs}s';
+    }
+    return '${hours}h ${minutes}m ${secs}s';
+  }
+
+  void _setWebFieldsFromSeconds({
+    required int seconds,
+    required TextEditingController hours,
+    required TextEditingController minutes,
+    required TextEditingController secs,
+  }) {
+    const int minute = 60;
+    const int hour = 60 * minute;
+    final totalHours = seconds ~/ hour;
+    final remaining = seconds % hour;
+    hours.text = totalHours.toString();
+    minutes.text = (remaining ~/ minute).toString();
+    secs.text = (remaining % minute).toString();
+  }
+
+  int _parseWebDuration({
+    required TextEditingController hours,
+    required TextEditingController minutes,
+    required TextEditingController secs,
+  }) {
+    final h = int.tryParse(hours.text.trim()) ?? 0;
+    final m = int.tryParse(minutes.text.trim()) ?? 0;
+    final s = int.tryParse(secs.text.trim()) ?? 0;
+    return (h * 3600) + (m * 60) + s;
+  }
+
+  Widget _buildWebDurationFields({
+    required String label,
+    required TextEditingController hoursController,
+    required TextEditingController minutesController,
+    required TextEditingController secondsController,
+    required ValueChanged<int> onChanged,
+    required String? Function() validator,
+    bool enabled = true,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.bodyLarge),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: hoursController,
+                decoration: const InputDecoration(
+                  labelText: 'Godziny',
+                  border: OutlineInputBorder(),
+                ),
+                enabled: enabled,
+                keyboardType: TextInputType.number,
+                onChanged: (_) => onChanged(
+                  _parseWebDuration(
+                    hours: hoursController,
+                    minutes: minutesController,
+                    secs: secondsController,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextFormField(
+                controller: minutesController,
+                decoration: const InputDecoration(
+                  labelText: 'Minuty',
+                  border: OutlineInputBorder(),
+                ),
+                enabled: enabled,
+                keyboardType: TextInputType.number,
+                onChanged: (_) => onChanged(
+                  _parseWebDuration(
+                    hours: hoursController,
+                    minutes: minutesController,
+                    secs: secondsController,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextFormField(
+                controller: secondsController,
+                decoration: const InputDecoration(
+                  labelText: 'Sekundy',
+                  border: OutlineInputBorder(),
+                ),
+                enabled: enabled,
+                keyboardType: TextInputType.number,
+                onChanged: (_) => onChanged(
+                  _parseWebDuration(
+                    hours: hoursController,
+                    minutes: minutesController,
+                    secs: secondsController,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        Builder(
+          builder: (_) {
+            final message = validator();
+            if (message == null) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                message,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }
