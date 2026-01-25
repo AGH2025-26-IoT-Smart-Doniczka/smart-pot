@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:smart_pot_mobile_app/models/pot_data.dart';
-
+import 'package:smart_pot_mobile_app/screens/plants/pot_config_screen.dart';
 
 class PotDetailScreen extends StatelessWidget {
   final Pot pot;
@@ -17,7 +17,11 @@ class PotDetailScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
-              // TODO: Nawigacja do ustawień doniczki
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => PotConfigScreen(pot: pot),
+                ),
+              );
             },
           ),
         ],
@@ -32,8 +36,8 @@ class PotDetailScreen extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: isHappy
-                    ? [Colors.green.shade300, Colors.green.shade500]
-                    : [Colors.orange.shade300, Colors.orange.shade500],
+                      ? [Colors.green.shade300, Colors.green.shade500]
+                      : [Colors.orange.shade300, Colors.orange.shade500],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -46,7 +50,9 @@ class PotDetailScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    isHappy ? 'Roślina czuje się świetnie!' : 'Roślina potrzebuje uwagi',
+                    isHappy
+                        ? 'Roślina czuje się świetnie!'
+                        : 'Roślina potrzebuje uwagi',
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -56,10 +62,24 @@ class PotDetailScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     'Ostatnia aktualizacja: ${pot.timeStamp}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.white70,
-                    ),
+                    style: const TextStyle(fontSize: 14, color: Colors.white70),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildConfigInfoChip(
+                        context,
+                        icon: Icons.sensors,
+                        label: '60 s',
+                      ),
+                      const SizedBox(width: 12),
+                      _buildConfigInfoChip(
+                        context,
+                        icon: Icons.cloud_upload,
+                        label: '300 s',
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -116,10 +136,14 @@ class PotDetailScreen extends StatelessWidget {
                   _buildParameterCard(
                     context,
                     icon: Icons.water_drop,
-                    iconColor: pot.data.soilMoisture > 30 ? Colors.blue : Colors.orange,
+                    iconColor: pot.data.soilMoisture > 30
+                        ? Colors.blue
+                        : Colors.orange,
                     title: 'Wilgotność gleby',
                     value: '${pot.data.soilMoisture.toStringAsFixed(0)}%',
-                    description: _getSoilMoistureDescription(pot.data.soilMoisture),
+                    description: _getSoilMoistureDescription(
+                      pot.data.soilMoisture,
+                    ),
                   ),
                   const SizedBox(height: 12),
 
@@ -130,13 +154,42 @@ class PotDetailScreen extends StatelessWidget {
                     iconColor: Colors.yellow,
                     title: 'Natężenie światła',
                     value: '${pot.data.illuminance.toStringAsFixed(0)} lx',
-                    description: _getIlluminanceDescription(pot.data.illuminance),
+                    description: _getIlluminanceDescription(
+                      pot.data.illuminance,
+                    ),
                   ),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildConfigInfoChip(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white, size: 18),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
