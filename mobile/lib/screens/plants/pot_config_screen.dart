@@ -40,6 +40,7 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
   int _wateringIntervalSec = 0;
   bool _autoWateringEnabled = false;
   bool _isSaving = false;
+  bool _isDisconnecting = false;
 
   @override
   void initState() {
@@ -134,6 +135,35 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
       if (!mounted) return;
       setState(() {
         _isSaving = false;
+      });
+    }
+  }
+
+  Future<void> _disconnectPot() async {
+    final shouldDisconnect = await _confirmDisconnect();
+    if (!shouldDisconnect) return;
+    if (!mounted) return;
+
+    setState(() {
+      _isDisconnecting = true;
+    });
+
+    try {
+      await context.read<PotsController>().disconnectPot(widget.pot.potId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Doniczka została rozłączona.')),
+      );
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Nie udało się rozłączyć: $e')),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isDisconnecting = false;
       });
     }
   }
@@ -342,7 +372,75 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
           ),
         ),
       ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: FilledButton.icon(
+            onPressed: _isDisconnecting ? null : _disconnectPot,
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            icon: const Icon(Icons.link_off),
+            label: Text(
+              _isDisconnecting ? 'Rozłączanie...' : 'Rozłącz doniczkę',
+            ),
+          ),
+        ),
+      ),
     );
+  }
+
+  Future<bool> _confirmDisconnect() async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) {
+            bool acknowledged = false;
+            return StatefulBuilder(
+              builder: (context, setDialogState) {
+                return AlertDialog(
+                  title: const Text('Rozłączyć doniczkę?'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Ta operacja jest nieodwracalna. Doniczka zostanie odłączona od konta.',
+                      ),
+                      const SizedBox(height: 12),
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text(
+                          'Rozumiem, że tej operacji nie można cofnąć.',
+                        ),
+                        value: acknowledged,
+                        onChanged: (value) {
+                          setDialogState(() {
+                            acknowledged = value ?? false;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(false),
+                      child: const Text('Anuluj'),
+                    ),
+                    FilledButton(
+                      onPressed: acknowledged
+                          ? () => Navigator.of(dialogContext).pop(true)
+                          : null,
+                      child: const Text('Rozłącz'),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        ) ??
+        false;
   }
 
   Future<int?> _showDurationPicker(

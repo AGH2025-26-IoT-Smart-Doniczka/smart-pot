@@ -5,7 +5,6 @@ from typing import Tuple
 from app.schemas.mqtt.pots import (
     WateringStatusMqttResponse,
 )
-from app.integrations.repositories.pots import watering_update
 
 
 logger = logging.getLogger(__name__)
@@ -41,4 +40,7 @@ def watering_status_worker() -> None:
             },
         )
 
-        watering_update(pot_id=pot_id, is_watering=is_watering)
+        logger.info(
+            "watering status ignored (status tracking removed)",
+            extra={"pot_id": pot_id, "is_watering": is_watering},
+        )

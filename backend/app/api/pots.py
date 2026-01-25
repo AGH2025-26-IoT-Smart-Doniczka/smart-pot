@@ -2,7 +2,7 @@ import os
 from decimal import Decimal
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, status, Query, Header
+from fastapi import APIRouter, HTTPException, status, Query, Header, Response
 from jwt import InvalidTokenError
 
 from ..schemas.pots import (
@@ -15,7 +15,6 @@ from ..schemas.pots import (
 from ..integrations.mqtt.MQTTClient import MQTTClient
 from ..schemas.mqtt.pots import WaterPlantMqttRequest, AddUserRequest
 from ..integrations.repositories.pots import (
-    get_watering_status,
     pot_exists,
     user_exists,
     pot_has_owner,
@@ -25,6 +24,7 @@ from ..integrations.repositories.pots import (
     update_config,
     update_owner_connection,
     get_user_pots,
+    delete_owner_connection,
 )
 from ..domain.hard_reset_handler import wait_for_hard_reset
 from ..utils.jwt_token import decode_access_token
@@ -43,9 +43,7 @@ def json_safe(obj):
     return obj
 
 
-# split functionality into smaller functions later ( ﾉ ﾟｰﾟ)ﾉ
-@router.get("", status_code=status.HTTP_200_OK)
-def list_user_pots(authorization: str | None = Header(default=None)):
+def get_user_id_from_auth(authorization: str | None) -> str:
     if not authorization:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -80,6 +78,14 @@ def list_user_pots(authorization: str | None = Header(default=None)):
             detail="Invalid token",
         )
 
+    return user_id
+
+
+# split functionality into smaller functions later ( ﾉ ﾟｰﾟ)ﾉ
+@router.get("", status_code=status.HTTP_200_OK)
+def list_user_pots(authorization: str | None = Header(default=None)):
+    user_id = get_user_id_from_auth(authorization)
+
     pots = get_user_pots(user_id)
 
     ILLUMINANCE_REVERSE = {
@@ -91,7 +97,6 @@ def list_user_pots(authorization: str | None = Header(default=None)):
     mapped = []
     for pot in pots:
         cfg = pot.get("config", {})
-        humidity = cfg.get("humidity") or {}
         mapped.append(
             {
                 **pot,
@@ -102,12 +107,8 @@ def list_user_pots(authorization: str | None = Header(default=None)):
                     "watering_interval_sec": cfg.get("watering_interval_sec"),
                     "max_temp": cfg.get("max_temp"),
                     "min_temp": cfg.get("min_temp"),
-                    "humidity": {
-                        "min": humidity.get("very_low") or 0,
-                        "opt_min": humidity.get("low") or 0,
-                        "opt_max": humidity.get("high") or 0,
-                        "max": humidity.get("very_high") or 0,
-                    },
+                    "min_moisture": cfg.get("min_moisture") or 0,
+                    "max_moisture": cfg.get("max_moisture") or 0,
                     "illuminance": ILLUMINANCE_REVERSE.get(cfg.get("illuminance"), "medium"),
                 },
             }
@@ -115,6 +116,25 @@ def list_user_pots(authorization: str | None = Header(default=None)):
 
     response = PotListResponse(pots=mapped)
     return response.model_dump()
+
+
+@router.delete("/{pot_id}/pairing", status_code=status.HTTP_204_NO_CONTENT)
+def unpair_pot(pot_id: str, authorization: str | None = Header(default=None)):
+    user_id = get_user_id_from_auth(authorization)
+
+    result = delete_owner_connection(pot_id=pot_id, user_id=user_id)
+    if result == "forbidden":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is not allowed to unpair this pot",
+        )
+    if result == "not_found":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Pot not found or not paired",
+        )
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/{pot_id}/pairing", status_code=status.HTTP_201_CREATED)
@@ -181,22 +201,6 @@ def water_plant(pot_id: str, data: WaterPlantRequest):
     return {"message": "Watering queued"}
 
 
-@router.get("/{pot_id}/actions/water/status", status_code=status.HTTP_200_OK)
-def water_status(pot_id: str):
-    try:
-        is_watering = get_watering_status(pot_id)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Cannot fetch watering status: {e}",
-        )
-
-    if is_watering:
-        return {"is_watering": True}
-    else:
-        return {"is_watering": False}
-
-
 @router.post("/{pot_id}/actions/config", status_code=status.HTTP_202_ACCEPTED)
 def config_change(pot_id: str, data: ConfigChangeRequest):
     ILLUMINANCE_MAP = {
@@ -229,10 +233,8 @@ def config_change(pot_id: str, data: ConfigChangeRequest):
         {
             "lux": updated["illuminance_type"],
             "moi": [
-                updated["humidity_thresholds"]["very_low"],
-                updated["humidity_thresholds"]["low"],
-                updated["humidity_thresholds"]["high"],
-                updated["humidity_thresholds"]["very_high"],
+                updated["min_moisture"],
+                updated["max_moisture"],
             ],
             "tem": [
                 updated["min_temperature"],
