@@ -1250,10 +1250,11 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
     }
 
     final email = _permissionEmailController.text.trim();
-    final existing = pot.connections.any(
+    final existingById = pot.connections.any((conn) => conn.userId == email);
+    final existingByEmail = pot.connections.any(
       (conn) => conn.email.toLowerCase() == email.toLowerCase(),
     );
-    if (existing) {
+    if (existingById || existingByEmail) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Użytkownik już ma dostęp. Użyj edycji.')),
       );
@@ -1268,7 +1269,7 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
       await context.read<PotsController>().addPotConnection(
         pot.potId,
         email: email,
-        role: potRoleToString(_newPermissionRole),
+        role: potRoleToString(_newPermissionRole).toUpperCase(),
       );
       _permissionEmailController.clear();
       setState(() {
@@ -1373,11 +1374,9 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
     try {
       await context.read<PotsController>().updatePotConnection(
         pot.potId,
-        connectionId: conn.id,
-        email: conn.email,
-        role: potRoleToString(newRole),
+        email: conn.email.isEmpty ? conn.userId : conn.email,
+        role: potRoleToString(newRole).toUpperCase(),
       );
-      await context.read<PotsController>().fetchPots();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -1399,10 +1398,8 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
     try {
       await context.read<PotsController>().deletePotConnection(
         pot.potId,
-        connectionId: conn.id,
-        email: conn.email,
+        email: conn.email.isEmpty ? conn.userId : conn.email,
       );
-      await context.read<PotsController>().fetchPots();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
