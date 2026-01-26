@@ -153,6 +153,40 @@ class PotsController extends ChangeNotifier {
     await fetchPots();
   }
 
+  Future<void> hardResetPot(String potId) async {
+    final user = _authController.currentUser;
+    if (user == null) {
+      throw Exception("Użytkownik nie jest zalogowany");
+    }
+
+    final url = Uri.parse('$_baseUrl/pots/$potId/hard-reset');
+    final response = await http.post(
+      url,
+      headers: {'Authorization': 'Bearer ${user.token}'},
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      String details = '';
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          details = decoded['detail']?.toString() ?? '';
+        } else if (decoded is String) {
+          details = decoded;
+        }
+      } catch (_) {
+        details = response.body;
+      }
+      throw Exception(
+        details.isNotEmpty
+            ? "Błąd twardego resetu: ${response.statusCode} ($details)"
+            : "Błąd twardego resetu: ${response.statusCode}",
+      );
+    }
+
+    await fetchPots();
+  }
+
   Future<void> addPotConnection(
     String potId, {
     required String email,
@@ -174,13 +208,28 @@ class PotsController extends ChangeNotifier {
     );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception("Błąd dodawania dostępu: ${response.statusCode}");
+      String details = '';
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          details = decoded['detail']?.toString() ?? '';
+        } else if (decoded is String) {
+          details = decoded;
+        }
+      } catch (_) {
+        details = response.body;
+      }
+      throw Exception(
+        details.isNotEmpty
+            ? "Błąd dodawania dostępu: ${response.statusCode} ($details)"
+            : "Błąd dodawania dostępu: ${response.statusCode}",
+      );
     }
+    await fetchPotConnections(potId);
   }
 
   Future<void> updatePotConnection(
     String potId, {
-    required String connectionId,
     required String email,
     required String role,
   }) async {
@@ -189,9 +238,7 @@ class PotsController extends ChangeNotifier {
       throw Exception("Użytkownik nie jest zalogowany");
     }
 
-    final url = connectionId.isNotEmpty
-        ? Uri.parse('$_baseUrl/pots/$potId/connections/$connectionId')
-        : Uri.parse('$_baseUrl/pots/$potId/connections');
+    final url = Uri.parse('$_baseUrl/pots/$potId/connections');
 
     final request = http.Request('PATCH', url);
     request.headers.addAll({
@@ -202,13 +249,29 @@ class PotsController extends ChangeNotifier {
 
     final response = await request.send();
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception("Błąd aktualizacji dostępu: ${response.statusCode}");
+      final body = await response.stream.bytesToString();
+      String details = '';
+      try {
+        final decoded = jsonDecode(body);
+        if (decoded is Map<String, dynamic>) {
+          details = decoded['detail']?.toString() ?? '';
+        } else if (decoded is String) {
+          details = decoded;
+        }
+      } catch (_) {
+        details = body;
+      }
+      throw Exception(
+        details.isNotEmpty
+            ? "Błąd aktualizacji dostępu: ${response.statusCode} ($details)"
+            : "Błąd aktualizacji dostępu: ${response.statusCode}",
+      );
     }
+    await fetchPotConnections(potId);
   }
 
   Future<void> deletePotConnection(
     String potId, {
-    required String connectionId,
     required String email,
   }) async {
     final user = _authController.currentUser;
@@ -216,22 +279,74 @@ class PotsController extends ChangeNotifier {
       throw Exception("Użytkownik nie jest zalogowany");
     }
 
-    final url = connectionId.isNotEmpty
-        ? Uri.parse('$_baseUrl/pots/$potId/connections/$connectionId')
-        : Uri.parse('$_baseUrl/pots/$potId/connections');
+    final url = Uri.parse('$_baseUrl/pots/$potId/connections');
 
     final request = http.Request('DELETE', url);
     request.headers.addAll({
       'Content-Type': 'application/json',
       'Authorization': 'Bearer ${user.token}',
     });
-    if (connectionId.isEmpty) {
-      request.body = json.encode({'email': email});
-    }
+    request.body = json.encode({'email': email});
 
     final response = await request.send();
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception("Błąd usuwania dostępu: ${response.statusCode}");
+      final body = await response.stream.bytesToString();
+      String details = '';
+      try {
+        final decoded = jsonDecode(body);
+        if (decoded is Map<String, dynamic>) {
+          details = decoded['detail']?.toString() ?? '';
+        } else if (decoded is String) {
+          details = decoded;
+        }
+      } catch (_) {
+        details = body;
+      }
+      throw Exception(
+        details.isNotEmpty
+            ? "Błąd usuwania dostępu: ${response.statusCode} ($details)"
+            : "Błąd usuwania dostępu: ${response.statusCode}",
+      );
     }
+    await fetchPotConnections(potId);
+  }
+
+  Future<void> fetchPotConnections(String potId) async {
+    final user = _authController.currentUser;
+    if (user == null) {
+      return;
+    }
+
+    final url = Uri.parse('$_baseUrl/pots/$potId/connections');
+    final response = await http.get(
+      url,
+      headers: {'Authorization': 'Bearer ${user.token}'},
+    );
+
+    if (response.statusCode != 200) {
+      return;
+    }
+
+    final List<dynamic> jsonData = jsonDecode(response.body);
+    final connections = jsonData
+        .whereType<Map>()
+        .map((item) => PotConnection.fromJson(item.cast<String, dynamic>()))
+        .toList();
+
+    final index = _pots.indexWhere((pot) => pot.potId == potId);
+    if (index == -1) return;
+    final existing = _pots[index];
+    _pots[index] = Pot(
+      id: existing.id,
+      potId: existing.potId,
+      timeStamp: existing.timeStamp,
+      data: existing.data,
+      userId: existing.userId,
+      role: existing.role,
+      name: existing.name,
+      config: existing.config,
+      connections: connections,
+    );
+    notifyListeners();
   }
 }
