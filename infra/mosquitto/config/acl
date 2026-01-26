@@ -1,6 +1,9 @@
 user backend
 topic readwrite #
 
+user mqtt-receiver
+topic read #
+
 user mqtt-agent
 topic read users/add
 
