@@ -486,3 +486,136 @@ def user_has_write_role(pot_id: str, user_id: str) -> bool:
                 )
     finally:
         conn.close()
+
+
+def get_connection_role(pot_id: str, user_id: str) -> str | None:
+    conn = get_connection()
+    try:
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT role
+                    FROM connections
+                    WHERE pot_id = %s
+                      AND user_id = %s
+                    LIMIT 1;
+                    """,
+                    (pot_id, user_id),
+                )
+                row = cur.fetchone()
+                return row["role"] if row else None
+    finally:
+        conn.close()
+
+
+def list_connections(pot_id: str) -> list[dict[str, Any]]:
+    conn = get_connection()
+    try:
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT c.user_id, c.role, u.email
+                    FROM connections c
+                    LEFT JOIN users u ON u.user_id = c.user_id
+                    WHERE pot_id = %s
+                    ORDER BY role DESC, user_id;
+                    """,
+                    (pot_id,),
+                )
+                return cur.fetchall()
+    finally:
+        conn.close()
+
+
+def upsert_connection_role(pot_id: str, user_id: str, role: str) -> str:
+    if role not in (ConnectionRole.VIEWER.value, ConnectionRole.EDITOR.value):
+        raise ValueError("Role must be VIEWER or EDITOR")
+
+    conn = get_connection()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO connections (user_id, pot_id, role)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (user_id, pot_id)
+                    DO UPDATE SET role = EXCLUDED.role;
+                    """,
+                    (user_id, pot_id, role),
+                )
+        return "upserted"
+    finally:
+        conn.close()
+
+
+def delete_connection(pot_id: str, user_id: str) -> str:
+    conn = get_connection()
+    try:
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    DELETE FROM connections
+                    WHERE pot_id = %s
+                      AND user_id = %s
+                    RETURNING role;
+                    """,
+                    (pot_id, user_id),
+                )
+                row = cur.fetchone()
+                return row["role"] if row else ""
+    finally:
+        conn.close()
+
+
+def delete_pot(pot_id: str) -> bool:
+    conn = get_connection()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT 1
+                    FROM pots
+                    WHERE pot_id = %s;
+                    """,
+                    (pot_id,),
+                )
+                exists = cur.fetchone() is not None
+                if not exists:
+                    return False
+
+                cur.execute(
+                    """
+                    DELETE FROM measures
+                    WHERE pot_id = %s;
+                    """,
+                    (pot_id,),
+                )
+                cur.execute(
+                    """
+                    DELETE FROM pot_logs
+                    WHERE pot_id = %s;
+                    """,
+                    (pot_id,),
+                )
+                cur.execute(
+                    """
+                    DELETE FROM connections
+                    WHERE pot_id = %s;
+                    """,
+                    (pot_id,),
+                )
+                cur.execute(
+                    """
+                    DELETE FROM pots
+                    WHERE pot_id = %s;
+                    """,
+                    (pot_id,),
+                )
+                return True
+    finally:
+        conn.close()

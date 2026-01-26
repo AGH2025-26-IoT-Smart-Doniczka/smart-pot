@@ -1,5 +1,6 @@
 from pydantic import BaseModel, field_validator, model_validator
 from typing import Literal, Optional
+from uuid import UUID
 from .roles import ConnectionRole
 
 class WaterPlantRequest(BaseModel):
@@ -100,3 +101,31 @@ class PotListResponse(BaseModel):
 
 class ChangeOwnerRequest(BaseModel):
     user_id: str
+
+
+class ConnectionRoleRequest(BaseModel):
+    user_id: UUID | None = None
+    email: str | None = None
+    role: str
+
+    @field_validator("role")
+    @classmethod
+    def role_allowed(cls, v: str) -> str:
+        return v.strip().upper()
+
+    @model_validator(mode="after")
+    def has_identifier(self):
+        if self.user_id is None and (self.email is None or not self.email.strip()):
+            raise ValueError("user_id or email is required")
+        return self
+
+
+class ConnectionDeleteRequest(BaseModel):
+    user_id: UUID | None = None
+    email: str | None = None
+
+    @model_validator(mode="after")
+    def has_identifier(self):
+        if self.user_id is None and (self.email is None or not self.email.strip()):
+            raise ValueError("user_id or email is required")
+        return self
