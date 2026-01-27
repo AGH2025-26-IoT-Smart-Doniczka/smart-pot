@@ -1,0 +1,7 @@
+{
+	"topic": "users/add",
+	"payload": {
+		"username": "example-user",
+		"password": "example-password"
+	}
+}

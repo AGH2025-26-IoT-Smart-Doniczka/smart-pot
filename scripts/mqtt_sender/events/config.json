@@ -1,0 +1,11 @@
+{
+	"topic": "devices/8813BF69B3DA/config",
+	"payload": {
+		"lux": 300,
+		"moi": [30, 60],
+		"tem": [18.0, 26.0],
+		"mes": 900,
+		"sen": 30,
+		"wat": 15
+	}
+}

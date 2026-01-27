@@ -1,0 +1,9 @@
+{
+	"topic": "devices/8813BF69B3DA/actions",
+	"payload": {
+		"typ": "wtr",
+		"data": {
+			"dur": 10
+		}
+	}
+}
