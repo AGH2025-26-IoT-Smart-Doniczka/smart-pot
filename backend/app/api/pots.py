@@ -3,6 +3,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, status, Query, Header, Response
+from fastapi.responses import JSONResponse
 from jwt import InvalidTokenError
 
 from ..schemas.pots import (
@@ -22,6 +23,7 @@ from ..integrations.repositories.pots import (
     pot_has_owner,
     get_pot_owner_username,
     insert_connection,
+    mark_mqtt_password_generated,
     get_history_measures,
     update_config,
     update_owner_connection,
@@ -147,23 +149,32 @@ def unpair_pot(pot_id: str, authorization: str | None = Header(default=None)):
 @router.post("/{pot_id}/pairing", status_code=status.HTTP_201_CREATED)
 def pair_plant_with_user(pot_id: str, data: PairingRequest):
     has_owner = pot_has_owner(pot_id)
-    mqtt_password = get_new_mqtt_password()
-    result = {"role": "owner", "mqtt": {"username": pot_id, "password": mqtt_password}}
     print(f"Pot {pot_id} has owner: {has_owner}")
-    if has_owner is not None and has_owner[0] == data.user_id:
-        return result
+    if has_owner is not None:
+        if has_owner[0] == data.user_id:
+            result = {"role": "owner", "mqtt": {"username": pot_id, "password": ""}}
+            return JSONResponse(result, status_code=status.HTTP_200_OK)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Pot already paired; hard reset required",
+        )
 
     try:
-        insert_connection(pot_id, data.user_id, has_owner)
+        connection = insert_connection(pot_id, data.user_id, has_owner)
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ve))
 
-    if has_owner is not None:
-        result["mqtt"]["password"] = ""
-        result["role"] = "user"
-        return JSONResponse(result, status_code=status.HTTP_200_OK)
+    if connection is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Pot already paired; hard reset required",
+        )
 
-    result["mqtt"]["password"] = mqtt_password
+    mqtt_password = ""
+    if mark_mqtt_password_generated(pot_id):
+        mqtt_password = get_new_mqtt_password(pot_id)
+
+    result = {"role": "owner", "mqtt": {"username": pot_id, "password": mqtt_password}}
     return JSONResponse(result, status_code=status.HTTP_200_OK)
 
 
