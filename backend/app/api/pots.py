@@ -623,7 +623,6 @@ def disconnect_reset_pot(pot_id: str, authorization: str | None = Header(default
     client_id = f"backend-disconnect-reset-{uuid4().hex[:8]}"
     mqtt_client = MQTTClient(client_id=client_id, persistent_session=False)
     mqtt_client.connect()
-
     try:
         topic = f"devices/{pot_id}/hard-reset"
         mqtt_client.publish(topic, "gg", qos=1, retain=False)

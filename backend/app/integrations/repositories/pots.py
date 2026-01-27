@@ -183,20 +183,32 @@ def pot_has_owner(pot_id: str) -> tuple[Any, ...] | None:
             return cur.fetchone()
 
 
-def mark_mqtt_password_generated(pot_id: str) -> bool:
+def get_mqtt_password(pot_id: str) -> str | None:
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT mqtt_password
+                FROM pots
+                WHERE pot_id = %s;
+                """,
+                (pot_id,),
+            )
+            row = cur.fetchone()
+            return row["mqtt_password"] if row else None
+
+
+def set_mqtt_password(pot_id: str, mqtt_password: str) -> None:
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
                 UPDATE pots
-                SET mqtt_password_generated = TRUE
-                WHERE pot_id = %s
-                  AND (mqtt_password_generated IS NULL OR mqtt_password_generated = FALSE)
-                RETURNING pot_id;
+                SET mqtt_password = %s
+                WHERE pot_id = %s;
                 """,
-                (pot_id,),
+                (mqtt_password, pot_id),
             )
-            return cur.fetchone() is not None
 
 
 def get_pot_owner_username(pot_id: str) -> str | None:
