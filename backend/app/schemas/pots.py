@@ -3,8 +3,9 @@ from typing import Literal, Optional
 from uuid import UUID
 from .roles import ConnectionRole
 
+
 class WaterPlantRequest(BaseModel):
-   duration: int  # Duration in seconds
+    duration: int  # Duration in seconds
 
 
 class WateringStatusResponse(BaseModel):
@@ -20,6 +21,7 @@ class ConfigChangeRequest(BaseModel):
     measure_interval_sec: int
     send_interval_sec: int
     watering_interval_sec: Optional[int] = None
+    watering_duration_sec: Optional[int] = None
     max_temp: float
     min_temp: float
     min_moisture: int
@@ -45,6 +47,15 @@ class ConfigChangeRequest(BaseModel):
     def watering_interval_positive(cls, v: Optional[int]) -> Optional[int]:
         if v is not None and v <= 0:
             raise ValueError("watering_interval_sec must be > 0")
+        return v
+
+    @field_validator("watering_duration_sec")
+    @classmethod
+    def watering_duration_positive(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and v <= 0:
+            raise ValueError("watering_duration_sec must be > 0")
+        if v is not None and v > 60:
+            raise ValueError("watering_duration_sec must be <= 60")
         return v
 
     @field_validator("min_temp", "max_temp")
@@ -79,6 +90,7 @@ class PotConfigResponse(BaseModel):
     measure_interval_sec: int
     send_interval_sec: int
     watering_interval_sec: Optional[int] = None
+    watering_duration_sec: Optional[int] = None
     max_temp: float
     min_temp: float
     min_moisture: int

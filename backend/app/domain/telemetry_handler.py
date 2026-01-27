@@ -5,9 +5,7 @@ from typing import Any, Tuple
 
 from pydantic import ValidationError
 
-from app.schemas.mqtt.pots import (
-    TelemetryMqttMessage
-)
+from app.schemas.mqtt.pots import TelemetryMqttMessage
 from app.integrations.repositories.pots import measures_insert
 
 
@@ -21,6 +19,7 @@ telemetry_queue: Queue[TelemetryEvent] = Queue()
 def telemetry_handler(topic: str, payload: dict) -> None:
     logger.info("ingress telemetry enqueued", extra={"topic": topic})
     telemetry_queue.put((topic, payload))
+
 
 def _normalize_payload(payload: Any) -> dict:
     if isinstance(payload, dict):
@@ -42,13 +41,13 @@ def telemetry_worker() -> None:
         try:
             raw_payload = _normalize_payload(payload)
         except (json.JSONDecodeError, UnicodeDecodeError, TypeError) as exc:
-            logger.warning("invalid telemetry payload", extra={"topic": topic, "error": str(exc)})
+            logger.warning(f"invalid telemetry payload. {payload = }, error = {str(exc)}")
             continue
 
         try:
             data = TelemetryMqttMessage(**raw_payload)
         except ValidationError as e:
-            logger.warning("telemetry validation error", extra={"topic": topic, "error": str(e)})
+            logger.warning(f"telemetry validation error, {raw_payload = }, error = {str(e)}")
             continue
 
         logger.info(
@@ -71,9 +70,10 @@ def telemetry_worker() -> None:
                 air_temp=data.data.tem,
                 air_pressure=data.data.pre,
                 soil_moisture=data.data.moi,
-                illuminance=data.data.lux
+                illuminance=data.data.lux,
             )
         except Exception as e:
-            logger.error("telemetry insert failed", extra={"pot_id": pot_id, "error": str(e)})
+            logger.error(f"telemetry insert failed. {pot_id = }, error = {str(e)}")
+
         else:
             logger.info("telemetry stored", extra={"pot_id": pot_id})

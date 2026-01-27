@@ -25,7 +25,8 @@ class ConfigChangeMqttRequest(BaseModel):
     tem: tuple[float, float]
     mes: int
     sen: int
-    wat: int
+    wai: int | None
+    wat: int | None
 
 
 class LogsMqttMessage(BaseModel):

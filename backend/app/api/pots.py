@@ -113,6 +113,7 @@ def list_user_pots(authorization: str | None = Header(default=None)):
                     "measure_interval_sec": cfg.get("measure_interval_sec") or 0,
                     "send_interval_sec": cfg.get("send_interval_sec") or 0,
                     "watering_interval_sec": cfg.get("watering_interval_sec"),
+                    "watering_duration_sec": cfg.get("watering_duration_sec"),
                     "max_temp": cfg.get("max_temp"),
                     "min_temp": cfg.get("min_temp"),
                     "min_moisture": cfg.get("min_moisture") or 0,
@@ -243,7 +244,8 @@ def config_change(
             ],
             "mes": updated["measure_interval_sec"],
             "sen": updated["send_interval_sec"],
-            "wat": updated["watering_interval_sec"],
+            "wai": updated["watering_interval_sec"] or 0,
+            "wat": updated["watering_duration_sec"] or 0,
         }
     )
 

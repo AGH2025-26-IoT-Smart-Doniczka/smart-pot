@@ -1,7 +1,7 @@
 {
 	"topic": "devices/8813BF69B3DA/telemetry",
 	"payload": {
-		"ts": 1710000000.0,
+		"ts": 1710000000.1,
 		"data": {
 			"lux": 123,
 			"tem": 22.5,
