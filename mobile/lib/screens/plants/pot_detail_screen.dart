@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:smart_pot_mobile_app/data/pots_controller.dart';
 import 'package:smart_pot_mobile_app/models/pot_data.dart';
 import 'package:smart_pot_mobile_app/screens/plants/pot_config_screen.dart';
+import 'package:smart_pot_mobile_app/screens/plants/pot_history_screen.dart';
 import 'package:intl/intl.dart';
 
 class PotDetailScreen extends StatefulWidget {
@@ -90,6 +91,16 @@ class _PotDetailScreenState extends State<PotDetailScreen> {
       appBar: AppBar(
         title: Text(viewPot.name),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.show_chart),
+            onPressed: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => PotHistoryScreen(pot: viewPot),
+                ),
+              );
+            },
+          ),
           if (role == PotRole.editor || role == PotRole.owner)
             IconButton(
               icon: const Icon(Icons.settings),

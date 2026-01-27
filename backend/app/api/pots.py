@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import uuid4
 
@@ -23,6 +24,7 @@ from ..integrations.repositories.pots import (
     get_mqtt_password,
     set_mqtt_password,
     get_history_measures,
+    get_history_measures_aggregated,
     update_config,
     update_owner_connection,
     get_user_pots,
@@ -149,7 +151,78 @@ def pair_plant_with_user(pot_id: str, authorization: str | None = Header(default
 
 
 @router.get("/{pot_id}/measures")
-def get_measures(pot_id: str, count: int = Query(10, ge=1, le=100)):
+def get_measures(
+    pot_id: str,
+    count: int = Query(10, ge=1, le=1000),
+    from_ts: datetime | None = Query(default=None, alias="from"),
+    to_ts: datetime | None = Query(default=None, alias="to"),
+    bucket: str | None = Query(default=None),
+    authorization: str | None = Header(default=None),
+):
+    user_id = get_user_id_from_auth(authorization)
+    role = get_connection_role(pot_id, user_id)
+    if role is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User has no access to this pot",
+        )
+
+    if (from_ts is None) != (to_ts is None):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Both 'from' and 'to' must be provided together",
+        )
+
+    if from_ts is not None and to_ts is not None:
+        if bucket is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Bucket must be provided for ranged queries",
+            )
+
+        if from_ts.tzinfo is None:
+            from_ts = from_ts.replace(tzinfo=timezone.utc)
+        if to_ts.tzinfo is None:
+            to_ts = to_ts.replace(tzinfo=timezone.utc)
+
+        bucket_map = {
+            "1h": 3600,
+            "6h": 21600,
+            "1d": 86400,
+        }
+        bucket_seconds = bucket_map.get(bucket)
+        if bucket_seconds is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Unsupported bucket value",
+            )
+
+        if from_ts > to_ts:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="'from' must be earlier than 'to'",
+            )
+
+        try:
+            measures = get_history_measures_aggregated(
+                pot_id=pot_id,
+                start_ts=from_ts,
+                end_ts=to_ts,
+                bucket_seconds=bucket_seconds,
+            )
+        except ValueError as ve:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(ve),
+            )
+        return {
+            "pot_id": pot_id,
+            "from": from_ts.astimezone(timezone.utc).isoformat(),
+            "to": to_ts.astimezone(timezone.utc).isoformat(),
+            "bucket": bucket,
+            "measures": json_safe(measures),
+        }
+
     try:
         measures = get_history_measures(pot_id, count)
     except ValueError as ve:
@@ -262,32 +335,6 @@ def config_change(
         "pot_id": pot_id,
         "newConfig": new_config,
     }
-
-
-@router.post("/{pot_id}/permissions/change-owner", status_code=status.HTTP_202_ACCEPTED)
-def change_owner(pot_id: str, data: dict):
-    new_user_id: str = data["user_id"]
-
-    fail = {"changed": False, "reason": "", "owner": get_pot_owner_username(pot_id)}
-
-    if not pot_exists(pot_id):
-        fail["reason"] = "Pot not found"
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=fail)
-    if not user_exists(new_user_id):
-        fail["reason"] = "User not found"
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=fail)
-
-    if not wait_for_hard_reset(pot_id, timeout=180):
-        fail["reason"] = "Hard reset not received from device"
-        raise HTTPException(status_code=status.HTTP_408_REQUEST_TIMEOUT, detail=fail)
-
-    try:
-        update_owner_connection(pot_id=pot_id, new_owner_id=new_user_id)
-    except SystemError as e:
-        fail["reason"] = "Database error during owner change"
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=fail)
-
-    return {"changed": True, "newOwner": get_pot_owner_username(pot_id)}
 
 
 def _require_owner(pot_id: str, user_id: str) -> None:
