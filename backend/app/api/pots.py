@@ -272,7 +272,7 @@ def config_change(
 
     try:
         topic = f"devices/{pot_id}/config"
-        mqtt_client.publish(topic, new_config, qos=1, retain=True)
+        mqtt_client.publish(topic, new_config, qos=1, retain=False)
     finally:
         mqtt_client.disconnect()
 

@@ -8,6 +8,7 @@ from paho.mqtt import enums, properties, reasoncodes
 
 
 MAX_SESSION_EXPIRY = 0xFFFFFFFF
+DEFAULT_SESSION_EXPIRY = 24 * 60 * 60
 
 
 class MQTTClient:
@@ -23,19 +24,13 @@ class MQTTClient:
         self.username = os.environ.get("MQTT_USER", "backend")
         self.password = os.environ.get("MQTT_PASSWORD", "backend-password")
 
-        self.client_id = client_id or os.environ.get(
-            "MQTT_CLIENT_ID", "backend-service"
-        )
+        self.client_id = client_id or os.environ.get("MQTT_CLIENT_ID", "backend-service")
 
         self.persistent_session = persistent_session
 
-        default_expiry = int(
-            os.environ.get("MQTT_SESSION_EXPIRY", str(MAX_SESSION_EXPIRY))
-        )
+        default_expiry = int(os.environ.get("MQTT_SESSION_EXPIRY", str(DEFAULT_SESSION_EXPIRY)))
         requested_expiry = session_expiry_interval or default_expiry
-        self.session_expiry_interval = max(
-            0, min(requested_expiry, MAX_SESSION_EXPIRY)
-        )
+        self.session_expiry_interval = max(0, min(requested_expiry, MAX_SESSION_EXPIRY))
 
         self.client = mqtt_client.Client(
             callback_api_version=enums.CallbackAPIVersion.VERSION2,
@@ -63,12 +58,8 @@ class MQTTClient:
         clean_start = True
 
         if self.persistent_session:
-            connect_props = properties.Properties(
-                properties.PacketTypes.CONNECT
-            )
-            connect_props.SessionExpiryInterval = (
-                self.session_expiry_interval
-            )
+            connect_props = properties.Properties(properties.PacketTypes.CONNECT)
+            connect_props.SessionExpiryInterval = self.session_expiry_interval
             clean_start = False
 
         self.client.connect(
@@ -87,9 +78,7 @@ class MQTTClient:
         disconnect_props = None
 
         if self.persistent_session:
-            disconnect_props = properties.Properties(
-                properties.PacketTypes.DISCONNECT
-            )
+            disconnect_props = properties.Properties(properties.PacketTypes.DISCONNECT)
             disconnect_props.SessionExpiryInterval = (
                 0 if clear_session else self.session_expiry_interval
             )
@@ -158,7 +147,14 @@ class MQTTClient:
         for topic, (_handler, qos) in self.handlers.items():
             client.subscribe(topic, qos=qos)
 
-    def _on_disconnect(self, client, userdata, reason_code, properties=None, *args):
+    def _on_disconnect(
+        self,
+        client,
+        userdata,
+        reason_code,
+        properties=None,
+        *args,
+    ) -> None:
         print("MQTT disconnected")
         print("Reason code:", reason_code)
         print("Properties:", properties)

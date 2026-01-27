@@ -62,7 +62,7 @@ def main() -> None:
         BROKER_HOST,
         BROKER_PORT,
         keepalive=60,
-        clean_start=False,
+        clean_start=False,  # False -> Read queued msg, True -> Ignore queued msg
         properties=connect_props,
     )
     client.loop_forever()
