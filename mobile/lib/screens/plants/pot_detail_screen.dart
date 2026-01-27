@@ -5,18 +5,78 @@ import 'package:smart_pot_mobile_app/models/pot_data.dart';
 import 'package:smart_pot_mobile_app/screens/plants/pot_config_screen.dart';
 import 'package:intl/intl.dart';
 
-class PotDetailScreen extends StatelessWidget {
+class PotDetailScreen extends StatefulWidget {
   final Pot pot;
   const PotDetailScreen({super.key, required this.pot});
 
   @override
+  State<PotDetailScreen> createState() => _PotDetailScreenState();
+}
+
+class _PotDetailScreenState extends State<PotDetailScreen> {
+  bool _isWatering = false;
+  late final TextEditingController _durationController;
+
+  @override
+  void initState() {
+    super.initState();
+    _durationController = TextEditingController(text: '5');
+  }
+
+  @override
+  void dispose() {
+    _durationController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleWatering() async {
+    final durationStr = _durationController.text.trim();
+    final duration = int.tryParse(durationStr);
+
+    if (duration == null || duration < 1 || duration > 60) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Czas musi być między 1 a 60 sekund')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isWatering = true;
+    });
+
+    try {
+      await context.read<PotsController>().waterPot(
+            widget.pot.potId,
+            duration: duration,
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Rozpoczęto podlewanie')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Błąd: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isWatering = false;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final currentPot = context.select<PotsController, Pot?>(
-      (ctrl) =>
-          ctrl.pots.firstWhere((p) => p.potId == pot.potId, orElse: () => pot),
+      (ctrl) => ctrl.pots.firstWhere(
+        (p) => p.potId == widget.pot.potId,
+        orElse: () => widget.pot,
+      ),
     );
 
-    final viewPot = currentPot ?? pot;
+    final viewPot = currentPot ?? widget.pot;
 
     final role = viewPot.role;
     final hasMeasurement = viewPot.timeStamp != 'Time not specified';
@@ -53,8 +113,8 @@ class PotDetailScreen extends StatelessWidget {
                 gradient: LinearGradient(
                   colors: hasMeasurement
                       ? (isHappy
-                            ? [Colors.green.shade300, Colors.green.shade500]
-                            : [Colors.orange.shade300, Colors.orange.shade500])
+                          ? [Colors.green.shade300, Colors.green.shade500]
+                          : [Colors.orange.shade300, Colors.orange.shade500])
                       : [Colors.grey.shade400, Colors.grey.shade600],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -91,8 +151,8 @@ class PotDetailScreen extends StatelessWidget {
                   Text(
                     hasMeasurement
                         ? (isHappy
-                              ? 'Roślina czuje się świetnie!'
-                              : 'Roślina potrzebuje uwagi')
+                            ? 'Roślina czuje się świetnie!'
+                            : 'Roślina potrzebuje uwagi')
                         : 'Roślina czeka na pierwszy pomiar parametrów',
                     style: const TextStyle(
                       fontSize: 20,
@@ -134,6 +194,56 @@ class PotDetailScreen extends StatelessWidget {
               ),
             ),
 
+            // Sekcja podlewania
+            if (role == PotRole.editor || role == PotRole.owner)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 100,
+                      child: TextFormField(
+                        controller: _durationController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Czas (s)',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: SizedBox(
+                        height: 50,
+                        child: ElevatedButton.icon(
+                          onPressed: _isWatering ? null : _handleWatering,
+                          icon: _isWatering
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.water_drop),
+                          label: Text(
+                            _isWatering ? 'Podlewanie...' : 'Podlej',
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue.shade100,
+                            foregroundColor: Colors.blue.shade900,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             // Sekcja z parametrami
             Padding(
               padding: const EdgeInsets.all(16),
@@ -148,7 +258,7 @@ class PotDetailScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   hasMeasurement
-                      ? _buildParametersGrid(context)
+                      ? _buildParametersGrid(context, viewPot)
                       : Text(
                           'Brak pomiaru',
                           style: Theme.of(context).textTheme.bodyMedium
@@ -208,7 +318,7 @@ class PotDetailScreen extends StatelessWidget {
     return '${days}d';
   }
 
-  Widget _buildParametersGrid(BuildContext context) {
+  Widget _buildParametersGrid(BuildContext context, Pot pot) {
     const double minCardWidth = 450;
     const double spacing = 12;
 

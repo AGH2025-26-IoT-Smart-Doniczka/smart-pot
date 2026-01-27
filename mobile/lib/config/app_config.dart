@@ -3,10 +3,11 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 class AppConfig {
-  static const String _envBaseUrl =
-      'https://unevenly-undecried-rafael.ngrok-free.dev';
+  static const String _envBaseUrl = String.fromEnvironment('BASE_URL');
+  static const String _baseUrl = "https://unevenly-undecried-rafael.ngrok-free.dev";
 
   static String get baseUrl {
+    return _baseUrl;
     if (_envBaseUrl.isNotEmpty) return _envBaseUrl;
 
     // Web runs in the browser on the host machine.

@@ -844,7 +844,8 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
     try {
       await context.read<PotsController>().updatePotConnection(
         pot.potId,
-        email: conn.email.isEmpty ? conn.userId : conn.email,
+        userId: conn.userId.isNotEmpty ? conn.userId : null,
+        email: conn.userId.isEmpty ? conn.email : null,
         role: potRoleToString(newRole).toUpperCase(),
       );
     } catch (e) {
@@ -868,7 +869,8 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
     try {
       await context.read<PotsController>().deletePotConnection(
         pot.potId,
-        email: conn.email.isEmpty ? conn.userId : conn.email,
+        userId: conn.userId.isNotEmpty ? conn.userId : null,
+        email: conn.userId.isEmpty ? conn.email : null,
       );
     } catch (e) {
       if (!mounted) return;

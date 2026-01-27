@@ -41,18 +41,7 @@ class _MainShellState extends State<MainShell> {
               context.read<ThemeController>().toggle();
             },
           ),
-          IconButton(
-            icon: Icon(Icons.settings),
-            onPressed: () {
-              // dodaj przejście do ustawień
-            },
-          ),
-          IconButton(
-            icon: Icon(Icons.person_2_rounded),
-            onPressed: () {
-              // dodaj przejście do profilu
-            },
-          ),
+
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {

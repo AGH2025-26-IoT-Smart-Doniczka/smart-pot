@@ -230,7 +230,8 @@ class PotsController extends ChangeNotifier {
 
   Future<void> updatePotConnection(
     String potId, {
-    required String email,
+    String? email,
+    String? userId,
     required String role,
   }) async {
     final user = _authController.currentUser;
@@ -238,14 +239,28 @@ class PotsController extends ChangeNotifier {
       throw Exception("Użytkownik nie jest zalogowany");
     }
 
-    final url = Uri.parse('$_baseUrl/pots/$potId/connections');
+    if (email == null && userId == null) {
+      throw Exception("Musisz podać email lub userId");
+    }
+
+    Uri url;
+    if (userId != null && userId.isNotEmpty) {
+      url = Uri.parse('$_baseUrl/pots/$potId/connections/$userId');
+    } else {
+      url = Uri.parse('$_baseUrl/pots/$potId/connections');
+    }
 
     final request = http.Request('PATCH', url);
     request.headers.addAll({
       'Content-Type': 'application/json',
       'Authorization': 'Bearer ${user.token}',
     });
-    request.body = json.encode({'email': email, 'role': role});
+
+    final body = {'role': role};
+    if (userId == null || userId.isEmpty) {
+      body['email'] = email!;
+    }
+    request.body = json.encode(body);
 
     final response = await request.send();
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -272,21 +287,34 @@ class PotsController extends ChangeNotifier {
 
   Future<void> deletePotConnection(
     String potId, {
-    required String email,
+    String? email,
+    String? userId,
   }) async {
     final user = _authController.currentUser;
     if (user == null) {
       throw Exception("Użytkownik nie jest zalogowany");
     }
 
-    final url = Uri.parse('$_baseUrl/pots/$potId/connections');
+    if (email == null && userId == null) {
+      throw Exception("Musisz podać email lub userId");
+    }
+
+    Uri url;
+    if (userId != null && userId.isNotEmpty) {
+      url = Uri.parse('$_baseUrl/pots/$potId/connections/$userId');
+    } else {
+      url = Uri.parse('$_baseUrl/pots/$potId/connections');
+    }
 
     final request = http.Request('DELETE', url);
     request.headers.addAll({
       'Content-Type': 'application/json',
       'Authorization': 'Bearer ${user.token}',
     });
-    request.body = json.encode({'email': email});
+
+    if (userId == null || userId.isEmpty) {
+      request.body = json.encode({'email': email});
+    }
 
     final response = await request.send();
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -348,5 +376,44 @@ class PotsController extends ChangeNotifier {
       connections: connections,
     );
     notifyListeners();
+  }
+
+  Future<bool> waterPot(String potId, {int duration = 5}) async {
+    final user = _authController.currentUser;
+    if (user == null) {
+      throw Exception("Użytkownik nie jest zalogowany");
+    }
+
+    final url = Uri.parse('$_baseUrl/pots/$potId/actions/water');
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${user.token}',
+      },
+      body: json.encode({'duration': duration}),
+    );
+
+    if (response.statusCode == 202) {
+      return true;
+    } else {
+      final body = response.body;
+      String details = '';
+      try {
+        final decoded = jsonDecode(body);
+        if (decoded is Map<String, dynamic>) {
+          details = decoded['detail']?.toString() ?? '';
+        } else if (decoded is String) {
+          details = decoded;
+        }
+      } catch (_) {
+        details = body;
+      }
+      throw Exception(
+        details.isNotEmpty
+            ? "Błąd podlewania: ${response.statusCode} ($details)"
+            : "Błąd podlewania: ${response.statusCode}",
+      );
+    }
   }
 }
