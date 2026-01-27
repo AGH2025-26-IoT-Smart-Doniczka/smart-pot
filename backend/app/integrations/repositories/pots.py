@@ -297,6 +297,82 @@ def get_history_measures(pot_id: str, count: int) -> list[dict[str, Any]]:
         conn.close()
 
 
+def get_history_measures_aggregated(
+    pot_id: str,
+    start_ts: datetime,
+    end_ts: datetime,
+    bucket_seconds: int,
+) -> list[dict[str, Any]]:
+    if not pot_exists(pot_id):
+        raise ValueError(f"Pot with id {pot_id} does not exist")
+    conn = get_connection()
+    try:
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                        SELECT
+                            to_timestamp(
+                                floor(extract(epoch from timestamp) / %s) * %s
+                            ) AS bucket_ts,
+                            avg(air_temp) AS air_temp_avg,
+                            min(air_temp) AS air_temp_min,
+                            max(air_temp) AS air_temp_max,
+                            avg(air_pressure) AS air_pressure_avg,
+                            min(air_pressure) AS air_pressure_min,
+                            max(air_pressure) AS air_pressure_max,
+                            avg(soil_moisture) AS soil_moisture_avg,
+                            min(soil_moisture) AS soil_moisture_min,
+                            max(soil_moisture) AS soil_moisture_max,
+                            avg(illuminance) AS illuminance_avg,
+                            min(illuminance) AS illuminance_min,
+                            max(illuminance) AS illuminance_max
+                        FROM measures
+                        WHERE pot_id = %s
+                          AND timestamp >= %s
+                          AND timestamp <= %s
+                        GROUP BY bucket_ts
+                        ORDER BY bucket_ts ASC;
+                        """,
+                    (bucket_seconds, bucket_seconds, pot_id, start_ts, end_ts),
+                )
+                result: list[dict[str, Any]] = []
+                for row in cur.fetchall():
+                    bucket_ts = row["bucket_ts"]
+                    result.append(
+                        {
+                            "timestamp": bucket_ts.isoformat()
+                            if isinstance(bucket_ts, datetime)
+                            else bucket_ts,
+                            "data": {
+                                "air_temp": {
+                                    "avg": row["air_temp_avg"],
+                                    "min": row["air_temp_min"],
+                                    "max": row["air_temp_max"],
+                                },
+                                "air_pressure": {
+                                    "avg": row["air_pressure_avg"],
+                                    "min": row["air_pressure_min"],
+                                    "max": row["air_pressure_max"],
+                                },
+                                "soil_moisture": {
+                                    "avg": row["soil_moisture_avg"],
+                                    "min": row["soil_moisture_min"],
+                                    "max": row["soil_moisture_max"],
+                                },
+                                "illuminance": {
+                                    "avg": row["illuminance_avg"],
+                                    "min": row["illuminance_min"],
+                                    "max": row["illuminance_max"],
+                                },
+                            },
+                        }
+                    )
+                return result
+    finally:
+        conn.close()
+
+
 def update_config(pot_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
     if not pot_exists(pot_id):
         raise ValueError(f"Pot with id {pot_id} does not exist")

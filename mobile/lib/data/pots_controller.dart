@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:smart_pot_mobile_app/data/auth_controller.dart';
 import 'package:smart_pot_mobile_app/models/pot_data.dart';
+import 'package:smart_pot_mobile_app/models/pot_history.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
@@ -187,6 +188,61 @@ class PotsController extends ChangeNotifier {
     await fetchPots();
   }
 
+  Future<List<PotHistoryPoint>> fetchPotHistory({
+    required String potId,
+    required DateTime from,
+    required DateTime to,
+    required String bucket,
+  }) async {
+    final user = _authController.currentUser;
+    if (user == null) {
+      throw Exception("Użytkownik nie jest zalogowany");
+    }
+
+    final query = Uri(queryParameters: {
+      'from': from.toUtc().toIso8601String(),
+      'to': to.toUtc().toIso8601String(),
+      'bucket': bucket,
+    });
+    final url = Uri.parse('$_baseUrl/pots/$potId/measures')
+        .replace(query: query.query);
+
+    final response = await http.get(
+      url,
+      headers: {'Authorization': 'Bearer ${user.token}'},
+    );
+
+    if (response.statusCode != 200) {
+      String details = '';
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          details = decoded['detail']?.toString() ?? '';
+        } else if (decoded is String) {
+          details = decoded;
+        }
+      } catch (_) {
+        details = response.body;
+      }
+      throw Exception(
+        details.isNotEmpty
+            ? "Błąd pobierania historii: ${response.statusCode} ($details)"
+            : "Błąd pobierania historii: ${response.statusCode}",
+      );
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic>) {
+      throw Exception("Nieprawidłowa odpowiedź serwera");
+    }
+
+    final measures = (decoded['measures'] as List<dynamic>?) ?? const [];
+    return measures
+        .whereType<Map<String, dynamic>>()
+        .map(PotHistoryPoint.fromJson)
+        .toList();
+  }
+
   Future<void> addPotConnection(
     String potId, {
     required String email,
@@ -259,6 +315,8 @@ class PotsController extends ChangeNotifier {
     final body = {'role': role};
     if (userId == null || userId.isEmpty) {
       body['email'] = email!;
+    } else {
+      body['user_id'] = userId;
     }
     request.body = json.encode(body);
 
