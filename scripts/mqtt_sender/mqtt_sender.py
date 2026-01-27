@@ -76,8 +76,8 @@ def _load_event(name: str) -> tuple[str, dict[str, Any]]:
     payload = data.get("payload")
     if not isinstance(topic, str):
         raise ValueError("Event file 'topic' must be a string")
-    if not isinstance(payload, dict):
-        raise ValueError("Event file 'payload' must be an object")
+    if not isinstance(payload, (dict, str)):
+        raise ValueError("Event file 'payload' must be an object or a string")
     return topic, payload
 
 
