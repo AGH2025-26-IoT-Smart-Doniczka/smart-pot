@@ -18,7 +18,7 @@ from app.domain.logs_handler import logs_handler
 mqtt_client = MQTTClient(
     client_id=os.environ.get("MQTT_CLIENT_ID", "backend-service"),
     persistent_session=True,
-    session_expiry_interval=0xFFFFFFFF,
+    session_expiry_interval=24 * 60 * 60,
 )
 
 
