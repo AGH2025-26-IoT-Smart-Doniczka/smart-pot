@@ -71,7 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             description: hasMeasurement
                                 ? "Temp: ${pot.data.airTemp.toStringAsFixed(1)}°C"
                                 : "Brak pomiaru",
-                            title: pot.potId,
+                            title: pot.name,
                             imageUrl: "assets/images/test_pot.png",
                             hasMeasurement: hasMeasurement,
                             onTap: () {
