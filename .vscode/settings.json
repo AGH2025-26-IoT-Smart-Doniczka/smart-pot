@@ -1,0 +1,8 @@
+{
+    "cmake.sourceDirectory": "/Users/jakubmikolajczyk/esp/smart-pot/firmware/all_sensors",
+    "idf.port": "/dev/tty.usbserial-110",
+    "idf.espIdfPath": "/Users/jakubmikolajczyk/esp/v5.5.1/esp-idf",
+    "idf.toolsPath": "/Users/jakubmikolajczyk/.espressif",
+    "idf.pythonInstallPath": "/opt/anaconda3/bin/python",
+    "idf.flashType": "UART"
+}
