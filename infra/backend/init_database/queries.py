@@ -36,6 +36,19 @@ queries = [
     )
     """,
     """
+    ALTER TABLE pots
+    ADD COLUMN IF NOT EXISTS mqtt_password_generated BOOLEAN;
+    """,
+    """
+    UPDATE pots
+    SET mqtt_password_generated = TRUE
+    WHERE mqtt_password_generated IS NULL;
+    """,
+    """
+    ALTER TABLE pots
+    ALTER COLUMN mqtt_password_generated SET DEFAULT FALSE;
+    """,
+    """
     UPDATE pots
     SET pot_name = pot_id
     WHERE pot_name IS NULL;
