@@ -1275,7 +1275,7 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
       setState(() {
         _newPermissionRole = PotRole.viewer;
       });
-      await context.read<PotsController>().fetchPots();
+
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

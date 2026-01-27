@@ -60,6 +60,17 @@ class _MainShellState extends State<MainShell> {
               );
             },
           ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () {
+              context.read<AuthController>().logout();
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                AppRoutes.login,
+                (route) => false,
+              );
+            },
+          ),
         ],
       ),
       body: IndexedStack(
