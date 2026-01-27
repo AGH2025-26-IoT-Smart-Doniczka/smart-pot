@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:smart_pot_mobile_app/data/auth_controller.dart';
 import 'package:smart_pot_mobile_app/models/pot_data.dart';
 import 'package:smart_pot_mobile_app/models/pot_history.dart';
+import 'package:smart_pot_mobile_app/services/ble_service.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
@@ -109,6 +110,8 @@ class PotsController extends ChangeNotifier {
     }
   }
 
+  final _bleService = BleService();
+
   Future<void> updatePotConfig(
     String potId,
     Map<String, dynamic> payload,
@@ -116,6 +119,25 @@ class PotsController extends ChangeNotifier {
     final user = _authController.currentUser;
     if (user == null) {
       throw Exception("Użytkownik nie jest zalogowany");
+    }
+
+    // Hybrid Update: BLE first
+    try {
+      final isConnected = await _bleService.isPotConnected(potId);
+      if (isConnected) {
+        debugPrint("Pot $potId is connected via BLE. Updating directly...");
+        final config = PotConfig.fromJson(payload, "Unknown");
+        final firmwareJson = config.toFirmwareJson();
+        await _bleService.writeCharacteristic(
+          potId,
+          BleService.CHARACTERISTICS_CONFIG_UUID,
+          firmwareJson,
+        );
+        debugPrint("BLE update successful.");
+      }
+    } catch (e) {
+      debugPrint("BLE update failed (fallback to HTTP): $e");
+      // Continue to HTTP even if BLE fails
     }
 
     final url = Uri.parse('$_baseUrl/pots/$potId/actions/config');
