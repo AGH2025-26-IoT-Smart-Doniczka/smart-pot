@@ -28,6 +28,7 @@ queries = [
         measure_interval_sec INTEGER NOT NULL DEFAULT 300,
         send_interval_sec INTEGER NOT NULL DEFAULT 300,
         watering_interval_sec INTEGER,
+        watering_duration_sec INTEGER,
         min_temperature NUMERIC(4,1) DEFAULT 10.0,
         max_temperature NUMERIC(4,1) DEFAULT 30.0,
         min_moisture INTEGER DEFAULT 0,
@@ -38,6 +39,10 @@ queries = [
     """
     ALTER TABLE pots
     ADD COLUMN IF NOT EXISTS mqtt_password TEXT;
+    """,
+    """
+    ALTER TABLE pots
+    ADD COLUMN IF NOT EXISTS watering_duration_sec INTEGER;
     """,
     """
     CREATE TABLE IF NOT EXISTS connections (

@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_pot_mobile_app/data/auth_controller.dart';
 import 'package:smart_pot_mobile_app/data/pots_controller.dart';
@@ -24,6 +25,8 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
   final TextEditingController _sendPeriodController = TextEditingController();
   final TextEditingController _wateringPeriodController =
       TextEditingController();
+  final TextEditingController _wateringDurationController =
+      TextEditingController();
   final TextEditingController _measureHoursController = TextEditingController();
   final TextEditingController _measureMinutesController =
       TextEditingController();
@@ -38,6 +41,12 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
       TextEditingController();
   final TextEditingController _wateringSecondsController =
       TextEditingController();
+  final TextEditingController _wateringDurationHoursController =
+      TextEditingController();
+  final TextEditingController _wateringDurationMinutesController =
+      TextEditingController();
+  final TextEditingController _wateringDurationSecondsController =
+      TextEditingController();
   final TextEditingController _minTempController = TextEditingController();
   final TextEditingController _maxTempController = TextEditingController();
   final TextEditingController _minMoistureController = TextEditingController();
@@ -47,6 +56,7 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
   int _measurementIntervalSec = 0;
   int _sendIntervalSec = 0;
   int _wateringIntervalSec = 0;
+  int _wateringDurationSec = 0;
   bool _autoWateringEnabled = false;
   bool _isSaving = false;
   bool _isDisconnecting = false;
@@ -89,6 +99,13 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
         secs: _wateringSecondsController,
       );
     }
+    if (widget.pot.config.wateringDurationSec != null) {
+      _wateringDurationSec = widget.pot.config.wateringDurationSec ?? 0;
+      _wateringDurationController.text = _wateringDurationSec.toString();
+      _wateringDurationHoursController.text = '0';
+      _wateringDurationMinutesController.text = '0';
+      _wateringDurationSecondsController.text = _wateringDurationSec.toString();
+    }
     _minTempController.text = widget.pot.config.minTemp.toString();
     _maxTempController.text = widget.pot.config.maxTemp.toString();
     _minMoistureController.text = widget.pot.config.minMoisture.toString();
@@ -107,6 +124,7 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
     _measurementPeriodController.dispose();
     _sendPeriodController.dispose();
     _wateringPeriodController.dispose();
+    _wateringDurationController.dispose();
     _measureHoursController.dispose();
     _measureMinutesController.dispose();
     _measureSecondsController.dispose();
@@ -116,6 +134,9 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
     _wateringHoursController.dispose();
     _wateringMinutesController.dispose();
     _wateringSecondsController.dispose();
+    _wateringDurationHoursController.dispose();
+    _wateringDurationMinutesController.dispose();
+    _wateringDurationSecondsController.dispose();
     _minTempController.dispose();
     _maxTempController.dispose();
     _minMoistureController.dispose();
@@ -136,6 +157,12 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
     final measureInterval = _measurementIntervalSec;
     final sendInterval = _sendIntervalSec;
     final wateringInterval = _autoWateringEnabled ? _wateringIntervalSec : null;
+    final wateringDuration =
+        _autoWateringEnabled &&
+            _wateringDurationSec > 0 &&
+            _wateringDurationSec <= 60
+        ? _wateringDurationSec
+        : null;
 
     final trimmedName = _nameController.text.trim();
     final payload = <String, dynamic>{
@@ -143,6 +170,7 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
       'measure_interval_sec': measureInterval,
       'send_interval_sec': sendInterval,
       'watering_interval_sec': wateringInterval,
+      'watering_duration_sec': wateringDuration,
       'min_temp': minTemp,
       'max_temp': maxTemp,
       'min_moisture': minMoisture,
@@ -607,6 +635,62 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
                     },
                   ),
             const SizedBox(height: 24),
+            kIsWeb
+                ? _buildWebSecondsField(
+                    label: 'Czas podlewania (opcjonalnie)',
+                    secondsController: _wateringDurationSecondsController,
+                    enabled: _autoWateringEnabled,
+                    onChanged: (value) {
+                      setState(() {
+                        _wateringDurationSec = value;
+                      });
+                    },
+                    validator: () {
+                      if (!_autoWateringEnabled) {
+                        return null;
+                      }
+                      if (_wateringDurationSec <= 0) {
+                        return 'Podaj czas podlewania.';
+                      }
+                      if (_wateringDurationSec > 60) {
+                        return 'Maksymalnie 60 sekund.';
+                      }
+                      return null;
+                    },
+                  )
+                : TextFormField(
+                    controller: _wateringDurationController,
+                    decoration: const InputDecoration(
+                      labelText: 'Czas podlewania (opcjonalnie)',
+                      hintText: 'Sekundy (1-60)',
+                      border: OutlineInputBorder(),
+                    ),
+                    enabled: _autoWateringEnabled,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      _MaxSecondsTextInputFormatter(maxSeconds: 60),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        _wateringDurationSec = int.tryParse(value.trim()) ?? 0;
+                      });
+                    },
+                    textInputAction: TextInputAction.done,
+                    validator: (_) {
+                      if (!_autoWateringEnabled) {
+                        return null;
+                      }
+                      if (_wateringDurationSec <= 0) {
+                        return 'Podaj czas podlewania.';
+                      }
+                      if (_wateringDurationSec > 60) {
+                        return 'Maksymalnie 60 sekund.';
+                      }
+                      return null;
+                    },
+                  ),
+            const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: _isSaving ? null : _saveConfiguration,
               icon: const Icon(Icons.save),
@@ -745,7 +829,6 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
       setState(() {
         _newPermissionRole = PotRole.viewer;
       });
-
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1183,6 +1266,7 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
                 ),
                 enabled: enabled,
                 keyboardType: TextInputType.number,
+                validator: (_) => validator(),
                 onChanged: (_) => onChanged(
                   _parseWebDuration(
                     hours: hoursController,
@@ -1247,5 +1331,78 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildWebSecondsField({
+    required String label,
+    required TextEditingController secondsController,
+    required ValueChanged<int> onChanged,
+    required String? Function() validator,
+    bool enabled = true,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.bodyLarge),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: secondsController,
+                decoration: const InputDecoration(
+                  labelText: 'Sekundy',
+                  border: OutlineInputBorder(),
+                ),
+                enabled: enabled,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  _MaxSecondsTextInputFormatter(maxSeconds: 60),
+                ],
+                validator: (_) => validator(),
+                onChanged: (_) =>
+                    onChanged(int.tryParse(secondsController.text.trim()) ?? 0),
+              ),
+            ),
+          ],
+        ),
+        Builder(
+          builder: (_) {
+            final message = validator();
+            if (message == null) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                message,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _MaxSecondsTextInputFormatter extends TextInputFormatter {
+  final int maxSeconds;
+
+  _MaxSecondsTextInputFormatter({required this.maxSeconds});
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text.trim();
+    if (text.isEmpty) {
+      return newValue;
+    }
+    final parsed = int.tryParse(text);
+    if (parsed == null || parsed > maxSeconds) {
+      return oldValue;
+    }
+    return newValue;
   }
 }

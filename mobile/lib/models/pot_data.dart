@@ -93,6 +93,7 @@ class PotConfig {
   final int measureIntervalSec;
   final int sendIntervalSec;
   final int? wateringIntervalSec;
+  final int? wateringDurationSec;
   final double maxTemp;
   final double minTemp;
   final int minMoisture;
@@ -104,6 +105,7 @@ class PotConfig {
     required this.measureIntervalSec,
     required this.sendIntervalSec,
     required this.wateringIntervalSec,
+    required this.wateringDurationSec,
     required this.maxTemp,
     required this.minTemp,
     required this.minMoisture,
@@ -118,6 +120,7 @@ class PotConfig {
       measureIntervalSec: (cfg['measure_interval_sec'] ?? 300) as int,
       sendIntervalSec: (cfg['send_interval_sec'] ?? 300) as int,
       wateringIntervalSec: cfg['watering_interval_sec'] as int?,
+      wateringDurationSec: cfg['watering_duration_sec'] as int?,
       maxTemp: (cfg['max_temp'] ?? 30.0).toDouble(),
       minTemp: (cfg['min_temp'] ?? 10.0).toDouble(),
       minMoisture: (cfg['min_moisture'] ?? 0) as int,
@@ -131,6 +134,7 @@ class PotConfig {
     'measure_interval_sec': measureIntervalSec,
     'send_interval_sec': sendIntervalSec,
     'watering_interval_sec': wateringIntervalSec,
+    'watering_duration_sec': wateringDurationSec,
     'max_temp': maxTemp,
     'min_temp': minTemp,
     'min_moisture': minMoisture,

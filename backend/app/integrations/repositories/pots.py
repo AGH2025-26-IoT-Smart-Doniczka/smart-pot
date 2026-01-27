@@ -317,7 +317,8 @@ def update_config(pot_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
                         illuminance_type = %(illuminance)s,
                         measure_interval_sec = %(measure_interval_sec)s,
                         send_interval_sec = %(send_interval_sec)s,
-                        watering_interval_sec = %(watering_interval_sec)s
+                        watering_interval_sec = %(watering_interval_sec)s,
+                        watering_duration_sec = %(watering_duration_sec)s
                     WHERE pot_id = %(pot_id)s
                     RETURNING *;
                     """,
@@ -332,6 +333,7 @@ def update_config(pot_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
                         "measure_interval_sec": data["measure_interval_sec"],
                         "send_interval_sec": data["send_interval_sec"],
                         "watering_interval_sec": data.get("watering_interval_sec"),
+                        "watering_duration_sec": data.get("watering_duration_sec"),
                     },
                 )
                 return cur.fetchone()
@@ -383,6 +385,7 @@ def get_user_pots(user_id: str) -> list[dict[str, Any]]:
                         p.measure_interval_sec,
                         p.send_interval_sec,
                         p.watering_interval_sec,
+                        p.watering_duration_sec,
                         p.max_temperature,
                         p.min_temperature,
                         p.min_moisture,
@@ -441,6 +444,7 @@ def get_user_pots(user_id: str) -> list[dict[str, Any]]:
                                 "measure_interval_sec": row["measure_interval_sec"],
                                 "send_interval_sec": row["send_interval_sec"],
                                 "watering_interval_sec": row["watering_interval_sec"],
+                                "watering_duration_sec": row["watering_duration_sec"],
                                 "max_temp": row["max_temperature"],
                                 "min_temp": row["min_temperature"],
                                 "min_moisture": row["min_moisture"],
@@ -644,6 +648,7 @@ def reset_pot_after_hard_reset(pot_id: str) -> bool:
                         measure_interval_sec = DEFAULT,
                         send_interval_sec = DEFAULT,
                         watering_interval_sec = NULL,
+                        watering_duration_sec = NULL,
                         min_temperature = DEFAULT,
                         max_temperature = DEFAULT,
                         min_moisture = DEFAULT,
@@ -741,6 +746,7 @@ def apply_hard_reset(pot_id: str, new_owner_id: str, mqtt_password: str) -> None
                             measure_interval_sec = DEFAULT,
                             send_interval_sec = DEFAULT,
                             watering_interval_sec = NULL,
+                            watering_duration_sec = NULL,
                             min_temperature = DEFAULT,
                             max_temperature = DEFAULT,
                             min_moisture = DEFAULT,

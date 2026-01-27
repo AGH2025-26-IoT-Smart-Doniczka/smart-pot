@@ -46,18 +46,18 @@ class _PotDetailScreenState extends State<PotDetailScreen> {
 
     try {
       await context.read<PotsController>().waterPot(
-            widget.pot.potId,
-            duration: duration,
-          );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Rozpoczęto podlewanie')),
+        widget.pot.potId,
+        duration: duration,
       );
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Rozpoczęto podlewanie')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Błąd: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Błąd: $e')));
     } finally {
       if (mounted) {
         setState(() {
@@ -84,6 +84,7 @@ class _PotDetailScreenState extends State<PotDetailScreen> {
     final measureInterval = viewPot.config.measureIntervalSec;
     final sendInterval = viewPot.config.sendIntervalSec;
     final wateringInterval = viewPot.config.wateringIntervalSec;
+    final wateringDuration = viewPot.config.wateringDurationSec;
 
     return Scaffold(
       appBar: AppBar(
@@ -113,8 +114,8 @@ class _PotDetailScreenState extends State<PotDetailScreen> {
                 gradient: LinearGradient(
                   colors: hasMeasurement
                       ? (isHappy
-                          ? [Colors.green.shade300, Colors.green.shade500]
-                          : [Colors.orange.shade300, Colors.orange.shade500])
+                            ? [Colors.green.shade300, Colors.green.shade500]
+                            : [Colors.orange.shade300, Colors.orange.shade500])
                       : [Colors.grey.shade400, Colors.grey.shade600],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -151,8 +152,8 @@ class _PotDetailScreenState extends State<PotDetailScreen> {
                   Text(
                     hasMeasurement
                         ? (isHappy
-                            ? 'Roślina czuje się świetnie!'
-                            : 'Roślina potrzebuje uwagi')
+                              ? 'Roślina czuje się świetnie!'
+                              : 'Roślina potrzebuje uwagi')
                         : 'Roślina czeka na pierwszy pomiar parametrów',
                     style: const TextStyle(
                       fontSize: 20,
@@ -186,6 +187,14 @@ class _PotDetailScreenState extends State<PotDetailScreen> {
                           context,
                           icon: Icons.water_drop,
                           label: _formatInterval(wateringInterval),
+                        ),
+                      ],
+                      if (wateringDuration != null) ...[
+                        const SizedBox(width: 12),
+                        _buildConfigInfoChip(
+                          context,
+                          icon: Icons.timer,
+                          label: _formatDurationSeconds(wateringDuration),
                         ),
                       ],
                     ],
@@ -230,9 +239,7 @@ class _PotDetailScreenState extends State<PotDetailScreen> {
                                   ),
                                 )
                               : const Icon(Icons.water_drop),
-                          label: Text(
-                            _isWatering ? 'Podlewanie...' : 'Podlej',
-                          ),
+                          label: Text(_isWatering ? 'Podlewanie...' : 'Podlej'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.blue.shade100,
                             foregroundColor: Colors.blue.shade900,
@@ -316,6 +323,10 @@ class _PotDetailScreenState extends State<PotDetailScreen> {
     }
     final days = seconds ~/ day;
     return '${days}d';
+  }
+
+  String _formatDurationSeconds(int seconds) {
+    return '${seconds}s';
   }
 
   Widget _buildParametersGrid(BuildContext context, Pot pot) {
