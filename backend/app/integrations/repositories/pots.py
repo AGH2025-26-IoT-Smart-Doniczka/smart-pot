@@ -587,6 +587,50 @@ def delete_connection(pot_id: str, user_id: str) -> str:
         conn.close()
 
 
+def delete_connections_for_pot(pot_id: str) -> None:
+    conn = get_connection()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    DELETE FROM connections
+                    WHERE pot_id = %s;
+                    """,
+                    (pot_id,),
+                )
+    finally:
+        conn.close()
+
+
+def reset_pot_after_hard_reset(pot_id: str) -> bool:
+    conn = get_connection()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE pots
+                    SET
+                        pot_name = NULL,
+                        measure_interval_sec = DEFAULT,
+                        send_interval_sec = DEFAULT,
+                        watering_interval_sec = NULL,
+                        min_temperature = DEFAULT,
+                        max_temperature = DEFAULT,
+                        min_moisture = DEFAULT,
+                        max_moisture = DEFAULT,
+                        illuminance_type = DEFAULT
+                    WHERE pot_id = %s
+                    RETURNING pot_id;
+                    """,
+                    (pot_id,),
+                )
+                return cur.fetchone() is not None
+    finally:
+        conn.close()
+
+
 def delete_pot(pot_id: str) -> bool:
     conn = get_connection()
     try:
