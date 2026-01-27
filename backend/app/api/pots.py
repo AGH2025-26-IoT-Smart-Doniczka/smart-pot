@@ -2,7 +2,7 @@ import os
 from decimal import Decimal
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, status, Query, Header, Response
+from fastapi import APIRouter, HTTPException, status, Query, Header
 from fastapi.responses import JSONResponse
 from jwt import InvalidTokenError
 
@@ -33,10 +33,10 @@ from ..integrations.repositories.pots import (
     list_connections,
     upsert_connection_role,
     delete_connection,
-    delete_pot,
+    delete_connections_for_pot,
+    reset_pot_after_hard_reset,
 )
 from ..integrations.repositories.user import get_user_id_by_email
-from ..domain.hard_reset_handler import wait_for_hard_reset
 from ..utils.jwt_token import decode_access_token
 from ..utils.mqtt_password import get_new_mqtt_password
 
@@ -127,25 +127,6 @@ def list_user_pots(authorization: str | None = Header(default=None)):
     return response.model_dump()
 
 
-@router.delete("/{pot_id}/pairing", status_code=status.HTTP_204_NO_CONTENT)
-def unpair_pot(pot_id: str, authorization: str | None = Header(default=None)):
-    user_id = get_user_id_from_auth(authorization)
-
-    role = get_connection_role(pot_id=pot_id, user_id=user_id)
-    if role is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Connection not found",
-        )
-    if role == ConnectionRole.OWNER.value:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Owner cannot unpair this pot",
-        )
-    delete_connection(pot_id=pot_id, user_id=user_id)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
 @router.post("/{pot_id}/pairing", status_code=status.HTTP_201_CREATED)
 def pair_plant_with_user(pot_id: str, data: PairingRequest):
     has_owner = pot_has_owner(pot_id)
@@ -173,6 +154,18 @@ def pair_plant_with_user(pot_id: str, data: PairingRequest):
     mqtt_password = ""
     if mark_mqtt_password_generated(pot_id):
         mqtt_password = get_new_mqtt_password(pot_id)
+        client_id = f"backend-mqtt-user-{uuid4().hex[:8]}"
+        mqtt_client = MQTTClient(client_id=client_id, persistent_session=False)
+        mqtt_client.connect()
+        try:
+            mqtt_client.publish(
+                "users/add",
+                AddUserRequest(username=pot_id, password=mqtt_password).model_dump(),
+                qos=1,
+                retain=False,
+            )
+        finally:
+            mqtt_client.disconnect()
 
     result = {"role": "owner", "mqtt": {"username": pot_id, "password": mqtt_password}}
     return JSONResponse(result, status_code=status.HTTP_200_OK)
@@ -455,7 +448,6 @@ def remove_connection(
     authorization: str | None = Header(default=None),
 ):
     user_id = get_user_id_from_auth(authorization)
-    _require_owner(pot_id, user_id)
 
     target_id = target_user_id
     if not target_id and data:
@@ -464,10 +456,22 @@ def remove_connection(
         elif data.email:
             target_id = get_user_id_by_email(data.email)
     if not target_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="user_id or email is required",
-        )
+        role = get_connection_role(pot_id, user_id)
+        if role is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Connection not found",
+            )
+        if role == ConnectionRole.OWNER.value:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Owner cannot remove own connection",
+            )
+        delete_connection(pot_id, user_id)
+        return {"detail": "Connection removed"}
+
+    _require_owner(pot_id, user_id)
+
     if target_id == user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -515,17 +519,22 @@ def hard_reset_pot(pot_id: str, authorization: str | None = Header(default=None)
             detail="User is not allowed to hard reset this pot",
         )
 
-    if not wait_for_hard_reset(pot_id, timeout=180):
-        raise HTTPException(
-            status_code=status.HTTP_408_REQUEST_TIMEOUT,
-            detail="Hard reset not received from device",
-        )
+    client_id = f"backend-hard-reset-{uuid4().hex[:8]}"
+    mqtt_client = MQTTClient(client_id=client_id, persistent_session=False)
+    mqtt_client.connect()
 
-    deleted = delete_pot(pot_id)
-    if not deleted:
+    try:
+        topic = f"devices/{pot_id}/hard-reset"
+        mqtt_client.publish(topic, {"action": "hard-reset"}, qos=1, retain=False)
+    finally:
+        mqtt_client.disconnect()
+
+    delete_connections_for_pot(pot_id)
+    reset_ok = reset_pot_after_hard_reset(pot_id)
+    if not reset_ok:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Pot not found",
         )
 
-    return {"detail": "Pot removed and reset"}
+    return {"detail": "Hard reset requested"}
