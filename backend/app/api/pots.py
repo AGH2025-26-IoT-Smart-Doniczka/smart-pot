@@ -8,7 +8,6 @@ from jwt import InvalidTokenError
 
 from ..schemas.pots import (
     WaterPlantRequest,
-    PairingRequest,
     ConfigChangeRequest,
     PotListResponse,
     ConnectionRoleRequest,
@@ -20,10 +19,9 @@ from ..schemas.mqtt.pots import ActionMqttRequest, WaterPlantMqttRequest, AddUse
 from ..integrations.repositories.pots import (
     pot_exists,
     user_exists,
-    pot_has_owner,
     get_pot_owner_username,
-    insert_connection,
-    mark_mqtt_password_generated,
+    get_mqtt_password,
+    set_mqtt_password,
     get_history_measures,
     update_config,
     update_owner_connection,
@@ -33,8 +31,9 @@ from ..integrations.repositories.pots import (
     list_connections,
     upsert_connection_role,
     delete_connection,
-    delete_connections_for_pot,
-    reset_pot_after_hard_reset,
+    insert_pot,
+    set_owner_with_previous_editor,
+    apply_hard_reset,
 )
 from ..integrations.repositories.user import get_user_id_by_email
 from ..utils.jwt_token import decode_access_token
@@ -127,45 +126,22 @@ def list_user_pots(authorization: str | None = Header(default=None)):
     return response.model_dump()
 
 
-@router.post("/{pot_id}/pairing", status_code=status.HTTP_201_CREATED)
-def pair_plant_with_user(pot_id: str, data: PairingRequest):
-    has_owner = pot_has_owner(pot_id)
-    print(f"Pot {pot_id} has owner: {has_owner}")
-    if has_owner is not None:
-        if has_owner[0] == data.user_id:
-            result = {"role": "owner", "mqtt": {"username": pot_id, "password": ""}}
-            return JSONResponse(result, status_code=status.HTTP_200_OK)
+@router.post("/{pot_id}/pairing", status_code=status.HTTP_200_OK)
+def pair_plant_with_user(pot_id: str, authorization: str | None = Header(default=None)):
+    user_id = get_user_id_from_auth(authorization)
+
+    if not user_exists(user_id):
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Pot already paired; hard reset required",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
         )
+
+    mqtt_password = get_mqtt_password(pot_id)
 
     try:
-        connection = insert_connection(pot_id, data.user_id, has_owner)
+        set_owner_with_previous_editor(pot_id, user_id)
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ve))
-
-    if connection is None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Pot already paired; hard reset required",
-        )
-
-    mqtt_password = ""
-    if mark_mqtt_password_generated(pot_id):
-        mqtt_password = get_new_mqtt_password(pot_id)
-        client_id = f"backend-mqtt-user-{uuid4().hex[:8]}"
-        mqtt_client = MQTTClient(client_id=client_id, persistent_session=False)
-        mqtt_client.connect()
-        try:
-            mqtt_client.publish(
-                "users/add",
-                AddUserRequest(username=pot_id, password=mqtt_password).model_dump(),
-                qos=1,
-                retain=False,
-            )
-        finally:
-            mqtt_client.disconnect()
 
     result = {"role": "owner", "mqtt": {"username": pot_id, "password": mqtt_password}}
     return JSONResponse(result, status_code=status.HTTP_200_OK)
@@ -499,42 +475,38 @@ def remove_connection(
     return {"detail": "Connection removed"}
 
 
-@router.post("/{pot_id}/hard-reset", status_code=status.HTTP_202_ACCEPTED)
+@router.post("/{pot_id}/hard-reset", status_code=status.HTTP_200_OK)
 def hard_reset_pot(pot_id: str, authorization: str | None = Header(default=None)):
     user_id = get_user_id_from_auth(authorization)
-    if not pot_exists(pot_id):
+    if not user_exists(user_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Pot not found",
-        )
-    role = get_connection_role(pot_id, user_id)
-    if role is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Connection not found",
-        )
-    if role != ConnectionRole.OWNER.value:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User is not allowed to hard reset this pot",
+            detail="User not found",
         )
 
-    client_id = f"backend-hard-reset-{uuid4().hex[:8]}"
+    mqtt_password = get_new_mqtt_password(pot_id)
+    client_id = f"backend-mqtt-user-{uuid4().hex[:8]}"
     mqtt_client = MQTTClient(client_id=client_id, persistent_session=False)
     mqtt_client.connect()
-
     try:
-        topic = f"devices/{pot_id}/hard-reset"
-        mqtt_client.publish(topic, {"action": "hard-reset"}, qos=1, retain=False)
+        mqtt_client.publish(
+            "users/add",
+            AddUserRequest(username=pot_id, password=mqtt_password).model_dump(),
+            qos=1,
+            retain=False,
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Failed to add MQTT user",
+        )
     finally:
         mqtt_client.disconnect()
 
-    delete_connections_for_pot(pot_id)
-    reset_ok = reset_pot_after_hard_reset(pot_id)
-    if not reset_ok:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Pot not found",
-        )
+    try:
+        apply_hard_reset(pot_id, user_id, mqtt_password)
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ve))
 
-    return {"detail": "Hard reset requested"}
+    result = {"role": "owner", "mqtt": {"username": pot_id, "password": mqtt_password}}
+    return JSONResponse(result, status_code=status.HTTP_200_OK)

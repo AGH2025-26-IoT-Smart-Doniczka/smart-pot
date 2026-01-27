@@ -62,20 +62,32 @@ def pot_has_owner(pot_id: str) -> tuple[Any, ...] | None:
             return cur.fetchone()
 
 
-def mark_mqtt_password_generated(pot_id: str) -> bool:
+def get_mqtt_password(pot_id: str) -> str | None:
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT mqtt_password
+                FROM pots
+                WHERE pot_id = %s;
+                """,
+                (pot_id,),
+            )
+            row = cur.fetchone()
+            return row["mqtt_password"] if row else None
+
+
+def set_mqtt_password(pot_id: str, mqtt_password: str) -> None:
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
                 UPDATE pots
-                SET mqtt_password_generated = TRUE
-                WHERE pot_id = %s
-                  AND (mqtt_password_generated IS NULL OR mqtt_password_generated = FALSE)
-                RETURNING pot_id;
+                SET mqtt_password = %s
+                WHERE pot_id = %s;
                 """,
-                (pot_id,),
+                (mqtt_password, pot_id),
             )
-            return cur.fetchone() is not None
 
 
 def get_pot_owner_username(pot_id: str) -> str | None:
@@ -127,7 +139,7 @@ def insert_connection(pot_id: str, user_id: str, has_owner: bool) -> dict[str, A
         conn.close()
 
 
-def insert_pot(pot_id: str) -> dict[str, Any] | None:
+def insert_pot(pot_id: str, mqtt_password: str | None = None) -> dict[str, Any] | None:
     try:
         conn = get_connection()
         try:
@@ -135,12 +147,12 @@ def insert_pot(pot_id: str) -> dict[str, Any] | None:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     cur.execute(
                         """
-                        INSERT INTO pots (pot_id, pot_name)
-                        VALUES (%s, %s)
+                        INSERT INTO pots (pot_id, pot_name, mqtt_password)
+                        VALUES (%s, %s, %s)
                         ON CONFLICT DO NOTHING
                         RETURNING *;
                         """,
-                        (pot_id, pot_id),
+                        (pot_id, pot_id, mqtt_password),
                     )
                     inserted_row = cur.fetchone()
                     print(f"[insert_pot] Inserted new pot with id={pot_id}")
@@ -603,6 +615,22 @@ def delete_connections_for_pot(pot_id: str) -> None:
         conn.close()
 
 
+def delete_measures_for_pot(pot_id: str) -> None:
+    conn = get_connection()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    DELETE FROM measures
+                    WHERE pot_id = %s;
+                    """,
+                    (pot_id,),
+                )
+    finally:
+        conn.close()
+
+
 def reset_pot_after_hard_reset(pot_id: str) -> bool:
     conn = get_connection()
     try:
@@ -627,6 +655,126 @@ def reset_pot_after_hard_reset(pot_id: str) -> bool:
                     (pot_id,),
                 )
                 return cur.fetchone() is not None
+    finally:
+        conn.close()
+
+
+def set_owner_with_previous_editor(pot_id: str, new_owner_id: str) -> None:
+    if not user_exists(new_owner_id):
+        raise ValueError(f"User with id {new_owner_id} does not exist")
+
+    conn = get_connection()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT user_id
+                    FROM connections
+                    WHERE pot_id = %s
+                      AND role = %s
+                    LIMIT 1;
+                    """,
+                    (pot_id, ConnectionRole.OWNER.value),
+                )
+                row = cur.fetchone()
+                prev_owner_id = row[0] if row else None
+
+                if prev_owner_id and prev_owner_id != new_owner_id:
+                    cur.execute(
+                        """
+                        UPDATE connections
+                        SET role = %s
+                        WHERE pot_id = %s
+                          AND user_id = %s;
+                        """,
+                        (ConnectionRole.EDITOR.value, pot_id, prev_owner_id),
+                    )
+
+                cur.execute(
+                    """
+                    INSERT INTO connections (user_id, pot_id, role)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (user_id, pot_id)
+                    DO UPDATE SET
+                        role = EXCLUDED.role;
+                    """,
+                    (new_owner_id, pot_id, ConnectionRole.OWNER.value),
+                )
+    finally:
+        conn.close()
+
+
+def apply_hard_reset(pot_id: str, new_owner_id: str, mqtt_password: str) -> None:
+    if not user_exists(new_owner_id):
+        raise ValueError(f"User with id {new_owner_id} does not exist")
+
+    conn = get_connection()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT 1
+                    FROM pots
+                    WHERE pot_id = %s;
+                    """,
+                    (pot_id,),
+                )
+                exists = cur.fetchone() is not None
+
+                if not exists:
+                    cur.execute(
+                        """
+                        INSERT INTO pots (pot_id, pot_name, mqtt_password)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT DO NOTHING;
+                        """,
+                        (pot_id, pot_id, mqtt_password),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        UPDATE pots
+                        SET
+                            pot_name = NULL,
+                            measure_interval_sec = DEFAULT,
+                            send_interval_sec = DEFAULT,
+                            watering_interval_sec = NULL,
+                            min_temperature = DEFAULT,
+                            max_temperature = DEFAULT,
+                            min_moisture = DEFAULT,
+                            max_moisture = DEFAULT,
+                            illuminance_type = DEFAULT,
+                            mqtt_password = %s
+                        WHERE pot_id = %s;
+                        """,
+                        (mqtt_password, pot_id),
+                    )
+
+                cur.execute(
+                    """
+                    DELETE FROM measures
+                    WHERE pot_id = %s;
+                    """,
+                    (pot_id,),
+                )
+                cur.execute(
+                    """
+                    DELETE FROM connections
+                    WHERE pot_id = %s;
+                    """,
+                    (pot_id,),
+                )
+                cur.execute(
+                    """
+                    INSERT INTO connections (user_id, pot_id, role)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (user_id, pot_id)
+                    DO UPDATE SET role = EXCLUDED.role;
+                    """,
+                    (new_owner_id, pot_id, ConnectionRole.OWNER.value),
+                )
     finally:
         conn.close()
 
