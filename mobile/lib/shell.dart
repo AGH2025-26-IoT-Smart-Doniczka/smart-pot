@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_pot_mobile_app/data/pots_controller.dart';
+import 'package:smart_pot_mobile_app/data/auth_controller.dart';
+import 'package:smart_pot_mobile_app/constants.dart';
 import 'package:smart_pot_mobile_app/screens/home/home_screen.dart';
 import 'package:smart_pot_mobile_app/screens/plants/plants_screen.dart';
 import 'package:smart_pot_mobile_app/theme/theme_controller.dart';
@@ -33,7 +35,6 @@ class _MainShellState extends State<MainShell> {
         title: Text("SmartPot"),
         //ikony po prawej
         actions: [
-          //tymaczasowo zmiana theme w pasku
           IconButton(
             icon: Icon(theme.isDark ? Icons.light_mode : Icons.dark_mode),
             onPressed: () {
@@ -50,6 +51,17 @@ class _MainShellState extends State<MainShell> {
             icon: Icon(Icons.person_2_rounded),
             onPressed: () {
               // dodaj przejście do profilu
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () {
+              context.read<AuthController>().logout();
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                AppRoutes.login,
+                (route) => false,
+              );
             },
           ),
         ],

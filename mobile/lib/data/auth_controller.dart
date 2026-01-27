@@ -13,11 +13,13 @@ class AuthController extends ChangeNotifier {
       const FlutterSecureStorage(); //bezpieczny magazyn do trzymania tokena jwt
 
   User? _currentUser;
+  bool _isAuthCheckComplete = false;
   bool _isLoading = false;
   String? _errorMessage;
 
   User? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
+  bool get isAuthCheckComplete => _isAuthCheckComplete;
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _currentUser != null;
 
@@ -29,11 +31,12 @@ class AuthController extends ChangeNotifier {
       try {
         final userData = json.decode(userDataString);
         _currentUser = User.fromLocal(userData, token);
-        notifyListeners();
       } catch (e) {
         await logout();
       }
     }
+    _isAuthCheckComplete = true;
+    notifyListeners();
   }
 
   Future<bool> register(String email, String password, String username) async {
