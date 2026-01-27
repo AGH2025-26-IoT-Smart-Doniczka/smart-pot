@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 from datetime import datetime, timezone
@@ -47,7 +48,18 @@ def message_callback(
     print(_format_payload(message.payload))
 
 
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Observe MQTT topics.")
+    parser.add_argument(
+        "--clean-start",
+        action="store_true",
+        help="Start a clean session (ignore queued messages)",
+    )
+    return parser.parse_args()
+
+
 def main() -> None:
+    args = _parse_args()
     client = mqtt_client.Client(
         callback_api_version=enums.CallbackAPIVersion.VERSION2,
         client_id=USERNAME,
@@ -62,7 +74,7 @@ def main() -> None:
         BROKER_HOST,
         BROKER_PORT,
         keepalive=60,
-        clean_start=False,  # False -> Read queued msg, True -> Ignore queued msg
+        clean_start=args.clean_start,
         properties=connect_props,
     )
     client.loop_forever()

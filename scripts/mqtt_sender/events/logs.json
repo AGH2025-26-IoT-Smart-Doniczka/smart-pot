@@ -1,0 +1,9 @@
+{
+	"topic": "devices/8813BF69B3DA/logs",
+	"payload": {
+		"ts": 1710000000.0,
+		"lab": "startup",
+		"lvl": 2,
+		"data": "Boot completed"
+	}
+}

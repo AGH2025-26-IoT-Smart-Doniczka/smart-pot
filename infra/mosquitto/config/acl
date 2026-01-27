@@ -4,6 +4,9 @@ topic readwrite #
 user mqtt-receiver
 topic read #
 
+user mqtt-sender
+topic write #
+
 user mqtt-agent
 topic read users/add
 
