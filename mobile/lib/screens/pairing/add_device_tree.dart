@@ -81,10 +81,10 @@ class _DeviceTreeState extends State<DeviceTree> {
       print(_connectedDevice!.id);
       print(potId);
 
-      Map<String, dynamic> pairingData = {
-        "role": "owner",
-        "mqtt": {"username": "TEST_MQTT_USER", "password": "TEST_MQTT_PASS"},
-      };
+      Map<String, dynamic> pairingData = await context
+          .read<PotsController>()
+          .pairPotWithServer(potId);
+
       print(pairingData);
       final String role = pairingData['role'] ?? 'user';
       final Map<String, dynamic> mqttData = pairingData['mqtt'] ?? {};

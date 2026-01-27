@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:smart_pot_mobile_app/data/pots_controller.dart';
 import 'package:smart_pot_mobile_app/models/pot_data.dart';
 import 'package:smart_pot_mobile_app/screens/plants/pot_config_screen.dart';
+import 'package:intl/intl.dart';
 
 class PotDetailScreen extends StatelessWidget {
   final Pot pot;
@@ -101,7 +102,7 @@ class PotDetailScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Ostatni pomiar: ${hasMeasurement ? viewPot.timeStamp : 'Brak'}',
+                    'Ostatni pomiar: ${hasMeasurement ? _formatDate(viewPot.timeStamp) : 'Brak'}',
                     style: const TextStyle(fontSize: 14, color: Colors.white70),
                   ),
                   const SizedBox(height: 16),
@@ -350,5 +351,16 @@ class PotDetailScreen extends StatelessWidget {
     if (illuminance < 1000) return 'Umiarkowane oświetlenie';
     if (illuminance < 5000) return 'Dobre oświetlenie';
     return 'Bardzo jasno - pełne słońce';
+  }
+
+  String _formatDate(dynamic dateString) {
+    if (dateString == null) return 'Brak';
+    try {
+      final DateTime date = DateTime.parse(dateString.toString());
+
+      return DateFormat('dd.MM.yyyy HH:mm').format(date.toLocal());
+    } catch (e) {
+      return 'Błąd daty';
+    }
   }
 }

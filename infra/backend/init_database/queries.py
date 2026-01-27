@@ -37,26 +37,7 @@ queries = [
     """,
     """
     ALTER TABLE pots
-    ADD COLUMN IF NOT EXISTS mqtt_password_generated BOOLEAN;
-    """,
-    """
-    UPDATE pots
-    SET mqtt_password_generated = TRUE
-    WHERE mqtt_password_generated IS NULL;
-    """,
-    """
-    ALTER TABLE pots
-    ALTER COLUMN mqtt_password_generated SET DEFAULT FALSE;
-    """,
-    """
-    UPDATE pots
-    SET pot_name = pot_id
-    WHERE pot_name IS NULL;
-    """,
-    """
-    UPDATE pots
-    SET send_interval_sec = measure_interval_sec
-    WHERE send_interval_sec IS NULL;
+    ADD COLUMN IF NOT EXISTS mqtt_password TEXT;
     """,
     """
     CREATE TABLE IF NOT EXISTS connections (

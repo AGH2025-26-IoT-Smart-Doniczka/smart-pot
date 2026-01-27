@@ -6,6 +6,7 @@ import 'package:smart_pot_mobile_app/screens/auth/register_screen.dart';
 import 'package:smart_pot_mobile_app/screens/pairing/add_device_tree.dart';
 import 'package:smart_pot_mobile_app/screens/plants/plants_screen.dart';
 import 'package:smart_pot_mobile_app/shell.dart';
+import 'package:smart_pot_mobile_app/screens/auth_wrapper.dart';
 import 'package:smart_pot_mobile_app/theme/theme_controller.dart';
 
 class SmartPotApp extends StatelessWidget {
@@ -19,7 +20,7 @@ class SmartPotApp extends StatelessWidget {
       title: "Smart Pot",
       initialRoute: AppRoutes.login,
       routes: {
-        AppRoutes.login: (context) => LoginScreen(),
+        AppRoutes.login: (context) => const AuthWrapper(),
         AppRoutes.register: (context) => RegisterScreen(),
         AppRoutes.home: (context) => MainShell(),
         AppRoutes.plants: (context) => MyPotsScreen(),
