@@ -141,6 +141,30 @@ class PotConfig {
     'max_moisture': maxMoisture,
     'illuminance': illuminance,
   };
+
+  Map<String, dynamic> toFirmwareJson() {
+    int luxValue = 1; // medium default
+    switch (illuminance.toLowerCase()) {
+      case 'low':
+        luxValue = 0;
+        break;
+      case 'high':
+        luxValue = 2;
+        break;
+      default:
+        luxValue = 1;
+    }
+
+    return {
+      'mes': measureIntervalSec,
+      'sen': sendIntervalSec,
+      'wai': wateringIntervalSec ?? 0,
+      'wat': wateringDurationSec ?? 0,
+      'tem': [minTemp, maxTemp],
+      'moi': [minMoisture, maxMoisture],
+      'lux': luxValue,
+    };
+  }
 }
 
 class Pot {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class WifiForm extends StatefulWidget {
-  final Function(String ssid, String password) onSubmit;
+  final Function(String ssid, String password, Map<String, dynamic> config) onSubmit;
   final bool isSending;
 
   const WifiForm({super.key, required this.onSubmit, this.isSending = false});
@@ -14,46 +14,123 @@ class _WifiFormState extends State<WifiForm> {
   final _ssidController = TextEditingController();
   final _passController = TextEditingController();
 
+  final _measureIntervalController = TextEditingController(text: "3600");
+  final _wateringDurationController = TextEditingController(text: "5");
+  RangeValues _moistureRange = const RangeValues(20, 60);
+
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text("Skonfiguruj Wi-Fi", style: Theme.of(context).textTheme.headlineSmall,),
-        SizedBox(height: 20,),
-        TextField(
-          controller: _ssidController,
-          decoration: InputDecoration(
-            labelText: "Nazwa sieci (SSID)",
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.wifi),
-          ),
-        ),
-        SizedBox(height: 15,),
-        TextField(
-          controller: _passController,
-          obscureText: true,
-          decoration: InputDecoration(
-            labelText: "Hasło do Wi-Fi",
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.lock),
-          ),
-        ),
-        SizedBox(height: 30,),
-        if(widget.isSending) CircularProgressIndicator()
-        else
-          ElevatedButton(
-            onPressed: () {
-              if(_ssidController.text.isNotEmpty){
-                widget.onSubmit(_ssidController.text, _passController.text);
-              }
-            },
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: Text("Wyślij do doniczki"),
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text("Skonfiguruj Wi-Fi", style: Theme.of(context).textTheme.headlineSmall),
+          SizedBox(height: 20),
+          TextField(
+            controller: _ssidController,
+            decoration: InputDecoration(
+              labelText: "Nazwa sieci (SSID)",
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.wifi),
             ),
-          )
-      ],
+          ),
+          SizedBox(height: 15),
+          TextField(
+            controller: _passController,
+            obscureText: true,
+            decoration: InputDecoration(
+              labelText: "Hasło do Wi-Fi",
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.lock),
+            ),
+          ),
+          
+          SizedBox(height: 30),
+          Text("Ustawienia początkowe", style: Theme.of(context).textTheme.titleMedium),
+          SizedBox(height: 15),
+          
+          TextField(
+            controller: _measureIntervalController,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: "Częstotliwość pomiarów (s)",
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.timer),
+            ),
+          ),
+          SizedBox(height: 15),
+           
+          Text("Zakres wilgotności: ${_moistureRange.start.round()}% - ${_moistureRange.end.round()}%"),
+          RangeSlider(
+            values: _moistureRange,
+            min: 0,
+            max: 100,
+            divisions: 100,
+            labels: RangeLabels(
+              _moistureRange.start.round().toString(),
+               _moistureRange.end.round().toString(),
+            ),
+            onChanged: (RangeValues values) {
+              setState(() {
+                _moistureRange = values;
+              });
+            },
+          ),
+          SizedBox(height: 15),
+          
+          TextField(
+            controller: _wateringDurationController,
+             keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: "Czas podlewania (s)",
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.water_drop),
+            ),
+          ),
+
+
+          SizedBox(height: 30),
+          if(widget.isSending) Center(child: CircularProgressIndicator())
+          else
+            ElevatedButton(
+              onPressed: _handleSubmit,
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                child: Text("Wyślij do doniczki"),
+              ),
+            )
+        ],
+      ),
     );
+  }
+
+  void _handleSubmit() {
+    if (_ssidController.text.isEmpty) {
+       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Podaj nazwę sieci")));
+       return;
+    }
+
+    final int? measureInterval = int.tryParse(_measureIntervalController.text);
+    if (measureInterval == null || measureInterval < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Błędny czas pomiaru")));
+      return;
+    }
+
+    final int? wateringDuration = int.tryParse(_wateringDurationController.text);
+    if (wateringDuration == null || wateringDuration < 0) {
+       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Błędny czas podlewania")));
+       return;
+    }
+
+    final config = {
+      "mes": measureInterval,
+      "moi": [_moistureRange.start.round(), _moistureRange.end.round()],
+      "wat": wateringDuration,
+      "sen": 7200,
+      "lux": 1, 
+      "wai": 0, // Disabled by default for setup? Or maybe give a default. User requested specific fields.
+    };
+
+    widget.onSubmit(_ssidController.text, _passController.text, config);
   }
 }

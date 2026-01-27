@@ -62,7 +62,7 @@ class _DeviceTreeState extends State<DeviceTree> {
     }
   }
 
-  Future<void> _sendWifiConfig(String ssid, String pass) async {
+  Future<void> _sendWifiConfig(String ssid, String pass, Map<String, dynamic> config) async {
     setState(() {
       _isProcessing = true;
     });
@@ -126,6 +126,7 @@ class _DeviceTreeState extends State<DeviceTree> {
         wifiPass: pass,
         mqttPass: mqttPass,
         mqttUser: mqttUser,
+        customConfig: config,
       );
 
       await _connectedDevice!.disconnect();

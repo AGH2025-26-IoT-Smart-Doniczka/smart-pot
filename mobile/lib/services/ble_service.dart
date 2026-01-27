@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:smart_pot_mobile_app/services/ble_types.dart';
+import 'package:smart_pot_mobile_app/services/ble_adapter.dart';
 
 class BleService {
   static const String SERVICE_UUID = "5c73aa37-a268-40d1-b8d8-7f7a479490a2";
@@ -21,6 +22,7 @@ class BleService {
     required String wifiPass,
     String? mqttUser,
     String? mqttPass,
+    Map<String, dynamic>? customConfig,
   }) async {
     try {
       await device.writeCharacteristic(
@@ -42,15 +44,55 @@ class BleService {
         );
       }
 
-      final config = _generateDefaultConfig();
+      List<int> configBytes;
+      if (customConfig != null) {
+        configBytes = utf8.encode(jsonEncode(customConfig));
+      } else {
+        configBytes = _generateDefaultConfig();
+      }
+
       await device.writeCharacteristic(
         SERVICE_UUID,
         CHARACTERISTICS_CONFIG_UUID,
-        config,
+        configBytes,
       );
     } catch (e) {
       throw Exception('Błąd zapisu konfiguracji: $e');
     }
+  }
+
+  Future<bool> isPotConnected(String potId) async {
+    final connectedDevices = await bleAdapter.getConnectedDevices();
+    return connectedDevices.any((d) => d.id == potId);
+  }
+
+  Future<void> writeCharacteristic(
+    String potId,
+    String characteristicUuid,
+    dynamic data,
+  ) async {
+    final connectedDevices = await bleAdapter.getConnectedDevices();
+    BleDevice? device;
+    try {
+      device = connectedDevices.firstWhere((d) => d.id == potId);
+    } catch (_) {
+      throw Exception("Device $potId not connected");
+    }
+
+    List<int> bytes;
+    if (data is List<int>) {
+      bytes = data;
+    } else if (data is String) {
+      bytes = utf8.encode(data);
+    } else {
+      bytes = utf8.encode(jsonEncode(data));
+    }
+
+    await device.writeCharacteristic(
+      SERVICE_UUID,
+      characteristicUuid,
+      bytes,
+    );
   }
 
   List<int> _generateDefaultConfig() {
