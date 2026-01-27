@@ -11,6 +11,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _isPasswordVisible = false;
 
   @override
   Widget build(BuildContext context) {
@@ -29,8 +30,23 @@ class _LoginScreenState extends State<LoginScreen> {
               SizedBox(height: 40),
               TextField(
                 controller: _passwordController,
-                decoration: InputDecoration(labelText: 'Hasło', prefixIcon: Icon(Icons.lock)),
-                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'Hasło',
+                  prefixIcon: Icon(Icons.lock),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _isPasswordVisible
+                          ? Icons.visibility
+                          : Icons.visibility_off,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _isPasswordVisible = !_isPasswordVisible;
+                      });
+                    },
+                  ),
+                ),
+                obscureText: !_isPasswordVisible,
               ),
               SizedBox(height: 10),
 
