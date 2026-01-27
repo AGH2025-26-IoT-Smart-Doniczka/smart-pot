@@ -33,6 +33,7 @@ static esp_event_loop_handle_t s_loop;
 static btn_ctx_t s_btn1;
 static btn_ctx_t s_btn2;
 static bool s_initialized;
+static int s_pressed_count;
 
 /* =========================================================================
    SECTION: Helpers
@@ -44,6 +45,20 @@ static void post_event(app_event_id_t id) {
     (void)esp_event_post_to(s_loop, APP_EVENTS, id, NULL, 0, 0);
 }
 
+static void pressed_count_inc(void)
+{
+    if (s_pressed_count < 2) {
+        s_pressed_count++;
+    }
+}
+
+static void pressed_count_dec(void)
+{
+    if (s_pressed_count > 0) {
+        s_pressed_count--;
+    }
+}
+
 
 static void button_single_click_cb(void *arg, void *data) {
     (void)arg;
@@ -52,6 +67,20 @@ static void button_single_click_cb(void *arg, void *data) {
         return;
     }
     post_event(ctx->ev_short);
+}
+
+static void button_press_down_cb(void *arg, void *data)
+{
+    (void)arg;
+    (void)data;
+    pressed_count_inc();
+}
+
+static void button_press_up_cb(void *arg, void *data)
+{
+    (void)arg;
+    (void)data;
+    pressed_count_dec();
 }
 
 static void button_long_press_up_cb(void *arg, void *data) {
@@ -90,6 +119,8 @@ static esp_err_t init_button_gpio(btn_ctx_t *b,
     button_handle_t gpio_btn = NULL;
     ESP_RETURN_ON_ERROR(iot_button_new_gpio_device(&btn_cfg, &gpio_cfg, &gpio_btn), TAG, "new gpio btn");
 
+    ESP_RETURN_ON_ERROR(iot_button_register_cb(gpio_btn, BUTTON_PRESS_DOWN, NULL, button_press_down_cb, b), TAG, "reg down");
+    ESP_RETURN_ON_ERROR(iot_button_register_cb(gpio_btn, BUTTON_PRESS_UP, NULL, button_press_up_cb, b), TAG, "reg up");
     ESP_RETURN_ON_ERROR(iot_button_register_cb(gpio_btn, BUTTON_SINGLE_CLICK, NULL, button_single_click_cb, b), TAG, "reg single");
 
     button_event_args_t long_args = {
@@ -134,5 +165,10 @@ esp_err_t buttons_manager_init(esp_event_loop_handle_t loop)
 esp_err_t buttons_manager_enable_deep_sleep_wakeup(void)
 {
     return esp_sleep_enable_ext0_wakeup(BSP_BTN1_PIN, BSP_BTN1_ACTIVE_LEVEL);
+}
+
+bool buttons_manager_is_any_pressed(void)
+{
+    return (s_pressed_count > 0);
 }
     

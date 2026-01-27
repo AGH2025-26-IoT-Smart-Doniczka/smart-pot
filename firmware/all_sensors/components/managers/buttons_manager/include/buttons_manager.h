@@ -16,3 +16,5 @@
 esp_err_t buttons_manager_init(esp_event_loop_handle_t loop);
 
 esp_err_t buttons_manager_enable_deep_sleep_wakeup(void);
+
+bool buttons_manager_is_any_pressed(void);

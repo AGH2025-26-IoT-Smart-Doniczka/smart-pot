@@ -1,0 +1,20 @@
+{
+  "C_Cpp.intelliSenseEngine": "default",
+  "idf.espIdfPath": "/Users/jakubmikolajczyk/esp/v5.5.1/esp-idf",
+  "idf.pythonInstallPath": "/opt/anaconda3/bin/python",
+  "idf.openOcdConfigs": [
+    "board/esp32-wrover-kit-3.3v.cfg"
+  ],
+  "idf.port": "/dev/tty.usbserial-10",
+  "idf.toolsPath": "/Users/jakubmikolajczyk/.espressif",
+  "idf.customExtraVars": {
+    "IDF_TARGET": "esp32"
+  },
+  "clangd.path": "/Users/jakubmikolajczyk/.espressif/tools/esp-clang/esp-19.1.2_20250312/esp-clang/bin/clangd",
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=**",
+    "--compile-commands-dir=/Users/jakubmikolajczyk/esp/all_sensors/build"
+  ],
+  "idf.flashType": "UART"
+}
