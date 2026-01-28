@@ -6,7 +6,7 @@ class AppConfig {
   static const String _envBaseUrl = String.fromEnvironment('BASE_URL');
 
   static String get baseUrl {
-    return "https://unevenly-undecried-rafael.ngrok-free.dev";
+    // return "https://unevenly-undecried-rafael.ngrok-free.dev";
     if (_envBaseUrl.isNotEmpty) return _envBaseUrl;
 
     // Web runs in the browser on the host machine.

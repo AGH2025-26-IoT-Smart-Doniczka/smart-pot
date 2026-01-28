@@ -13,12 +13,14 @@ from ..schemas.pots import (
     PotListResponse,
     ConnectionRoleRequest,
     ConnectionDeleteRequest,
+    PotRenameRequest,
 )
 from ..schemas.roles import ConnectionRole
 from ..integrations.mqtt.MQTTClient import MQTTClient
 from ..schemas.mqtt.pots import ActionMqttRequest, WaterPlantMqttRequest, AddUserRequest
 from ..integrations.repositories.pots import (
     pot_exists,
+    pot_is_active,
     user_exists,
     get_pot_owner_username,
     get_mqtt_password,
@@ -36,7 +38,9 @@ from ..integrations.repositories.pots import (
     insert_pot,
     set_owner_with_previous_editor,
     apply_hard_reset,
-    delete_connections_for_pot,
+    archive_pot,
+    update_pot_name,
+    delete_pot,
 )
 from ..integrations.repositories.user import get_user_id_by_email
 from ..utils.jwt_token import decode_access_token
@@ -111,6 +115,7 @@ def list_user_pots(authorization: str | None = Header(default=None)):
         mapped.append(
             {
                 **pot,
+                "is_active": pot.get("is_active", True),
                 "config": {
                     "pot_name": cfg.get("pot_name") or pot.get("name") or pot.get("pot_id"),
                     "measure_interval_sec": cfg.get("measure_interval_sec") or 0,
@@ -139,6 +144,9 @@ def pair_plant_with_user(pot_id: str, authorization: str | None = Header(default
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
+
+    if not pot_exists(pot_id):
+        insert_pot(pot_id)
 
     mqtt_password = get_mqtt_password(pot_id)
 
@@ -240,9 +248,11 @@ def water_plant(pot_id: str, data: WaterPlantRequest):
         )
 
     if not pot_exists(pot_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pot not found")
+    if not pot_is_active(pot_id):
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Pot not found",
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Pot is inactive",
         )
 
     client_id = f"backend-water-{uuid4().hex[:8]}"
@@ -277,6 +287,13 @@ def config_change(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User is not allowed to change configuration",
+        )
+    if not pot_exists(pot_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pot not found")
+    if not pot_is_active(pot_id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Pot is inactive",
         )
 
     ILLUMINANCE_MAP = {
@@ -336,6 +353,31 @@ def config_change(
         "pot_id": pot_id,
         "newConfig": new_config,
     }
+
+
+@router.patch("/{pot_id}/name", status_code=status.HTTP_200_OK)
+def rename_pot(
+    pot_id: str,
+    data: PotRenameRequest,
+    authorization: str | None = Header(default=None),
+):
+    user_id = get_user_id_from_auth(authorization)
+    if not user_has_write_role(pot_id, user_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is not allowed to change configuration",
+        )
+    if not pot_exists(pot_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pot not found")
+
+    pot_name = data.pot_name.strip() if data.pot_name else None
+    try:
+        updated = update_pot_name(pot_id, pot_name)
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ve))
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pot not found")
+    return {"pot_id": pot_id, "pot_name": updated.get("pot_name")}
 
 
 def _require_owner(pot_id: str, user_id: str) -> None:
@@ -582,5 +624,24 @@ def disconnect_reset_pot(pot_id: str, authorization: str | None = Header(default
     finally:
         mqtt_client.disconnect()
 
-    delete_connections_for_pot(pot_id)
-    return {"detail": "Connections removed and hard reset published"}
+    archived = archive_pot(pot_id)
+    if archived is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pot not found")
+
+    insert_pot(pot_id, mqtt_password=archived.get("mqtt_password"))
+    return {"detail": "Pot archived and hard reset published"}
+
+
+@router.delete("/{pot_id}", status_code=status.HTTP_200_OK)
+def delete_pot_endpoint(pot_id: str, authorization: str | None = Header(default=None)):
+    user_id = get_user_id_from_auth(authorization)
+    _require_owner(pot_id, user_id)
+    if pot_is_active(pot_id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Active pot cannot be deleted",
+        )
+    deleted = delete_pot(pot_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pot not found")
+    return {"detail": "Pot deleted"}

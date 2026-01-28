@@ -1,4 +1,5 @@
 from datetime import datetime
+from uuid import uuid4
 from typing import Any
 
 from psycopg2 import IntegrityError
@@ -23,6 +24,43 @@ def pot_exists(pot_id: str) -> bool:
                 )
                 row = cur.fetchone()
                 return row is not None
+    finally:
+        conn.close()
+
+
+def pot_is_active(pot_id: str) -> bool:
+    conn = get_connection()
+    try:
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT is_active
+                    FROM pots
+                    WHERE pot_id = %s;
+                    """,
+                    (pot_id,),
+                )
+                row = cur.fetchone()
+                return bool(row["is_active"]) if row else False
+    finally:
+        conn.close()
+
+
+def get_pot_row(pot_id: str) -> dict[str, Any] | None:
+    conn = get_connection()
+    try:
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT *
+                    FROM pots
+                    WHERE pot_id = %s;
+                    """,
+                    (pot_id,),
+                )
+                return cur.fetchone()
     finally:
         conn.close()
 
@@ -417,6 +455,27 @@ def update_config(pot_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
         conn.close()
 
 
+def update_pot_name(pot_id: str, pot_name: str | None) -> dict[str, Any] | None:
+    if not pot_exists(pot_id):
+        raise ValueError(f"Pot with id {pot_id} does not exist")
+    conn = get_connection()
+    try:
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    UPDATE pots
+                    SET pot_name = %s
+                    WHERE pot_id = %s
+                    RETURNING *;
+                    """,
+                    (pot_name, pot_id),
+                )
+                return cur.fetchone()
+    finally:
+        conn.close()
+
+
 def update_owner_connection(pot_id: str, new_owner_id: str) -> None:
     conn = get_connection()
     try:
@@ -457,6 +516,7 @@ def get_user_pots(user_id: str) -> list[dict[str, Any]]:
                     """
                     SELECT
                         p.pot_id,
+                        p.is_active,
                         p.pot_name,
                         p.measure_interval_sec,
                         p.send_interval_sec,
@@ -515,6 +575,7 @@ def get_user_pots(user_id: str) -> list[dict[str, Any]]:
                             "user_id": row["user_id"],
                             "role": row["role"],
                             "name": row["pot_name"] or row["pot_id"],
+                            "is_active": row["is_active"],
                             "config": {
                                 "pot_name": row["pot_name"] or row["pot_id"],
                                 "measure_interval_sec": row["measure_interval_sec"],
@@ -740,6 +801,40 @@ def reset_pot_after_hard_reset(pot_id: str) -> bool:
         conn.close()
 
 
+def archive_pot(pot_id: str) -> dict[str, Any] | None:
+    conn = get_connection()
+    try:
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT *
+                    FROM pots
+                    WHERE pot_id = %s
+                      AND is_active = TRUE;
+                    """,
+                    (pot_id,),
+                )
+                row = cur.fetchone()
+                if row is None:
+                    return None
+
+                new_pot_id = str(uuid4())
+                cur.execute(
+                    """
+                    UPDATE pots
+                    SET pot_id = %s,
+                        is_active = FALSE
+                    WHERE pot_id = %s;
+                    """,
+                    (new_pot_id, pot_id),
+                )
+                row["archived_pot_id"] = new_pot_id
+                return row
+    finally:
+        conn.close()
+
+
 def set_owner_with_previous_editor(pot_id: str, new_owner_id: str) -> None:
     if not user_exists(new_owner_id):
         raise ValueError(f"User with id {new_owner_id} does not exist")
@@ -796,58 +891,48 @@ def apply_hard_reset(pot_id: str, new_owner_id: str, mqtt_password: str) -> None
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    SELECT 1
+                    SELECT mqtt_password
                     FROM pots
-                    WHERE pot_id = %s;
+                    WHERE pot_id = %s
+                      AND is_active = TRUE;
                     """,
                     (pot_id,),
                 )
-                exists = cur.fetchone() is not None
-
-                if not exists:
-                    cur.execute(
-                        """
-                        INSERT INTO pots (pot_id, pot_name, mqtt_password)
-                        VALUES (%s, %s, %s)
-                        ON CONFLICT DO NOTHING;
-                        """,
-                        (pot_id, pot_id, mqtt_password),
-                    )
-                else:
+                row = cur.fetchone()
+                if row is not None:
+                    new_archived_id = str(uuid4())
                     cur.execute(
                         """
                         UPDATE pots
-                        SET
-                            pot_name = NULL,
-                            measure_interval_sec = DEFAULT,
-                            send_interval_sec = DEFAULT,
-                            watering_interval_sec = NULL,
-                            watering_duration_sec = NULL,
-                            min_temperature = DEFAULT,
-                            max_temperature = DEFAULT,
-                            min_moisture = DEFAULT,
-                            max_moisture = DEFAULT,
-                            illuminance_type = DEFAULT,
-                            mqtt_password = %s
+                        SET pot_id = %s,
+                            is_active = FALSE
                         WHERE pot_id = %s;
                         """,
-                        (mqtt_password, pot_id),
+                        (new_archived_id, pot_id),
                     )
 
                 cur.execute(
                     """
-                    DELETE FROM measures
-                    WHERE pot_id = %s;
+                    INSERT INTO pots (pot_id, pot_name, mqtt_password, is_active)
+                    VALUES (%s, %s, %s, TRUE)
+                    ON CONFLICT (pot_id)
+                    DO UPDATE SET
+                        pot_name = NULL,
+                        measure_interval_sec = DEFAULT,
+                        send_interval_sec = DEFAULT,
+                        watering_interval_sec = NULL,
+                        watering_duration_sec = NULL,
+                        min_temperature = DEFAULT,
+                        max_temperature = DEFAULT,
+                        min_moisture = DEFAULT,
+                        max_moisture = DEFAULT,
+                        illuminance_type = DEFAULT,
+                        mqtt_password = EXCLUDED.mqtt_password,
+                        is_active = TRUE;
                     """,
-                    (pot_id,),
+                    (pot_id, pot_id, mqtt_password),
                 )
-                cur.execute(
-                    """
-                    DELETE FROM connections
-                    WHERE pot_id = %s;
-                    """,
-                    (pot_id,),
-                )
+
                 cur.execute(
                     """
                     INSERT INTO connections (user_id, pot_id, role)

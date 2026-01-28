@@ -177,6 +177,7 @@ class Pot {
   final String name;
   final PotConfig config;
   final List<PotConnection> connections;
+  final bool isActive;
 
   Pot({
     required this.id,
@@ -188,6 +189,7 @@ class Pot {
     required this.name,
     required this.config,
     required this.connections,
+    required this.isActive,
   });
 
   factory Pot.fromJson(Map<String, dynamic> json) {
@@ -201,6 +203,7 @@ class Pot {
       json['config'] as Map<String, dynamic>?,
       name,
     );
+    final isActive = (json['is_active'] ?? json['isActive'] ?? true) as bool;
     final connectionsJson = (json['connections'] as List<dynamic>?) ?? const [];
     final connections = connectionsJson
         .whereType<Map>()
@@ -220,6 +223,7 @@ class Pot {
       role: potRoleFromString(json['role']?.toString()),
       config: config,
       connections: connections,
+      isActive: isActive,
     );
   }
 }
