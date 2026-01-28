@@ -218,7 +218,7 @@ class PotsController extends ChangeNotifier {
 
     // Zgodnie ze specyfikacją, używamy tego samego endpointu co przy ręcznym hard reset
     final url = Uri.parse('$_baseUrl/pots/$potId/hard-reset');
-    
+
     try {
       final response = await http.post(
         url,
@@ -236,6 +236,40 @@ class PotsController extends ChangeNotifier {
     }
   }
 
+  Future<void> disconnectResetPot(String potId) async {
+    final user = _authController.currentUser;
+    if (user == null) {
+      throw Exception("Użytkownik nie jest zalogowany");
+    }
+
+    final url = Uri.parse('$_baseUrl/pots/$potId/disconnect-reset');
+    final response = await http.post(
+      url,
+      headers: {'Authorization': 'Bearer ${user.token}'},
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      String details = '';
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          details = decoded['detail']?.toString() ?? '';
+        } else if (decoded is String) {
+          details = decoded;
+        }
+      } catch (_) {
+        details = response.body;
+      }
+      throw Exception(
+        details.isNotEmpty
+            ? "Błąd rozłączania i resetu: ${response.statusCode} ($details)"
+            : "Błąd rozłączania i resetu: ${response.statusCode}",
+      );
+    }
+
+    await fetchPots();
+  }
+
   Future<List<PotHistoryPoint>> fetchPotHistory({
     required String potId,
     required DateTime from,
@@ -247,13 +281,16 @@ class PotsController extends ChangeNotifier {
       throw Exception("Użytkownik nie jest zalogowany");
     }
 
-    final query = Uri(queryParameters: {
-      'from': from.toUtc().toIso8601String(),
-      'to': to.toUtc().toIso8601String(),
-      'bucket': bucket,
-    });
-    final url = Uri.parse('$_baseUrl/pots/$potId/measures')
-        .replace(query: query.query);
+    final query = Uri(
+      queryParameters: {
+        'from': from.toUtc().toIso8601String(),
+        'to': to.toUtc().toIso8601String(),
+        'bucket': bucket,
+      },
+    );
+    final url = Uri.parse(
+      '$_baseUrl/pots/$potId/measures',
+    ).replace(query: query.query);
 
     final response = await http.get(
       url,

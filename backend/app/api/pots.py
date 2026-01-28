@@ -36,6 +36,7 @@ from ..integrations.repositories.pots import (
     insert_pot,
     set_owner_with_previous_editor,
     apply_hard_reset,
+    delete_connections_for_pot,
 )
 from ..integrations.repositories.user import get_user_id_by_email
 from ..utils.jwt_token import decode_access_token
@@ -559,3 +560,27 @@ def hard_reset_pot(pot_id: str, authorization: str | None = Header(default=None)
 
     result = {"role": "owner", "mqtt": {"username": pot_id, "password": mqtt_password}}
     return JSONResponse(result, status_code=status.HTTP_200_OK)
+
+
+@router.post("/{pot_id}/disconnect-reset", status_code=status.HTTP_200_OK)
+def disconnect_reset_pot(pot_id: str, authorization: str | None = Header(default=None)):
+    user_id = get_user_id_from_auth(authorization)
+    _require_owner(pot_id, user_id)
+
+    client_id = f"backend-disconnect-reset-{uuid4().hex[:8]}"
+    mqtt_client = MQTTClient(client_id=client_id, persistent_session=False)
+    mqtt_client.connect()
+
+    try:
+        topic = f"devices/{pot_id}/hard-reset"
+        mqtt_client.publish(topic, "gg", qos=1, retain=False)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Failed to publish hard reset",
+        )
+    finally:
+        mqtt_client.disconnect()
+
+    delete_connections_for_pot(pot_id)
+    return {"detail": "Connections removed and hard reset published"}
