@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 
 class WifiForm extends StatefulWidget {
-  final Function(String ssid, String password, Map<String, dynamic> config) onSubmit;
+  final Function(String ssid, String password, Map<String, dynamic>? config) onSubmit;
   final bool isSending;
+  final bool isHardReset;
 
-  const WifiForm({super.key, required this.onSubmit, this.isSending = false});
+  const WifiForm({
+    super.key,
+    required this.onSubmit,
+    this.isSending = false,
+    required this.isHardReset,
+  });
 
   @override
   State<WifiForm> createState() => _WifiFormState();
@@ -20,13 +26,25 @@ class _WifiFormState extends State<WifiForm> {
   final _wateringDurationController = TextEditingController(text: "5");
   RangeValues _moistureRange = const RangeValues(20, 60);
 
+  bool _showConfig = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // If hard reset, we MUST show config
+    _showConfig = widget.isHardReset;
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text("Skonfiguruj Wi-Fi", style: Theme.of(context).textTheme.headlineSmall),
+          Text(
+            "Skonfiguruj Wi-Fi",
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
           SizedBox(height: 20),
           TextField(
             controller: _ssidController,
@@ -46,79 +64,115 @@ class _WifiFormState extends State<WifiForm> {
               prefixIcon: Icon(Icons.lock),
             ),
           ),
-          
           SizedBox(height: 30),
-          Text("Ustawienia początkowe", style: Theme.of(context).textTheme.titleMedium),
-          SizedBox(height: 15),
-          
-          TextField(
-            controller: _measureIntervalController,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: "Częstotliwość pomiarów (s)",
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.timer),
+          if (!widget.isHardReset && !_showConfig) ...[
+             Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.green),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          "Urządzenie wstępnie skonfigurowane. Aktualizujemy tylko Wi-Fi.",
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-          SizedBox(height: 15),
+             TextButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _showConfig = true;
+                  });
+                },
+                icon: Icon(Icons.settings),
+                label: Text("Pokaż/Zmień zaawansowane ustawienia"),
+              ),
+          ],
 
-          TextField(
-            controller: _sendIntervalController,
-             keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: "Częstotliwość wysyłania (s)",
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.cloud_upload),
+          if (_showConfig) ...[
+            Text(
+              "Ustawienia początkowe",
+              style: Theme.of(context).textTheme.titleMedium,
             ),
-          ),
-          SizedBox(height: 15),
-           
-          Text("Zakres wilgotności: ${_moistureRange.start.round()}% - ${_moistureRange.end.round()}%"),
-          RangeSlider(
-            values: _moistureRange,
-            min: 0,
-            max: 100,
-            divisions: 100,
-            labels: RangeLabels(
-              _moistureRange.start.round().toString(),
-               _moistureRange.end.round().toString(),
+            SizedBox(height: 15),
+            TextField(
+              controller: _measureIntervalController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: "Częstotliwość pomiarów (s)",
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.timer),
+              ),
             ),
-            onChanged: (RangeValues values) {
-              setState(() {
-                _moistureRange = values;
-              });
-            },
-          ),
-          SizedBox(height: 15),
-
-          TextField(
-            controller: _wateringIntervalController,
-             keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: "Interwał podlewania (s, 0=wył)",
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.schedule),
+            SizedBox(height: 15),
+            TextField(
+              controller: _sendIntervalController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: "Częstotliwość wysyłania (s)",
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.cloud_upload),
+              ),
             ),
-          ),
-          SizedBox(height: 15),
-          
-          TextField(
-            controller: _wateringDurationController,
-             keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: "Czas podlewania (s)",
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.water_drop),
+            SizedBox(height: 15),
+            Text(
+              "Zakres wilgotności: ${_moistureRange.start.round()}% - ${_moistureRange.end.round()}%",
             ),
-          ),
-
-
+            RangeSlider(
+              values: _moistureRange,
+              min: 0,
+              max: 100,
+              divisions: 100,
+              labels: RangeLabels(
+                _moistureRange.start.round().toString(),
+                _moistureRange.end.round().toString(),
+              ),
+              onChanged: (RangeValues values) {
+                setState(() {
+                  _moistureRange = values;
+                });
+              },
+            ),
+            SizedBox(height: 15),
+            TextField(
+              controller: _wateringIntervalController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: "Interwał podlewania (s, 0=wył)",
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.schedule),
+              ),
+            ),
+            SizedBox(height: 15),
+            TextField(
+              controller: _wateringDurationController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: "Czas podlewania (s)",
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.water_drop),
+              ),
+            ),
+          ],
           SizedBox(height: 30),
-          if(widget.isSending) Center(child: CircularProgressIndicator())
+          if (widget.isSending)
+            Center(child: CircularProgressIndicator())
           else
             ElevatedButton(
               onPressed: _handleSubmit,
-              child: const Padding(
+              child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 child: Text("Wyślij do doniczki"),
               ),
@@ -130,42 +184,63 @@ class _WifiFormState extends State<WifiForm> {
 
   void _handleSubmit() {
     if (_ssidController.text.isEmpty) {
-       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Podaj nazwę sieci")));
-       return;
-    }
-
-    final int? measureInterval = int.tryParse(_measureIntervalController.text);
-    if (measureInterval == null || measureInterval < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Błędny czas pomiaru")));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Podaj nazwę sieci")));
       return;
     }
 
-    final int? sendInterval = int.tryParse(_sendIntervalController.text);
-    if (sendInterval == null || sendInterval < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Błędny czas wysyłania")));
-      return;
-    }
+    Map<String, dynamic>? config;
 
-    final int? wateringInterval = int.tryParse(_wateringIntervalController.text);
-    if (wateringInterval == null || wateringInterval < 0) {
-       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Błędny interwał podlewania")));
-       return;
-    }
+    // Only generate config if we are effectively showing/editing it
+    if (_showConfig) {
+      final int? measureInterval = int.tryParse(
+        _measureIntervalController.text,
+      );
+      if (measureInterval == null || measureInterval < 0) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Błędny czas pomiaru")));
+        return;
+      }
 
-    final int? wateringDuration = int.tryParse(_wateringDurationController.text);
-    if (wateringDuration == null || wateringDuration < 0) {
-       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Błędny czas podlewania")));
-       return;
-    }
+      final int? sendInterval = int.tryParse(_sendIntervalController.text);
+      if (sendInterval == null || sendInterval < 0) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Błędny czas wysyłania")));
+        return;
+      }
 
-    final config = {
-      "mes": measureInterval,
-      "moi": [_moistureRange.start.round(), _moistureRange.end.round()],
-      "wat": wateringDuration,
-      "sen": sendInterval,
-      "lux": 1, 
-      "wai": wateringInterval,
-    };
+      final int? wateringInterval = int.tryParse(
+        _wateringIntervalController.text,
+      );
+      if (wateringInterval == null || wateringInterval < 0) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Błędny interwał podlewania")));
+        return;
+      }
+
+      final int? wateringDuration = int.tryParse(
+        _wateringDurationController.text,
+      );
+      if (wateringDuration == null || wateringDuration < 0) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Błędny czas podlewania")));
+        return;
+      }
+
+      config = {
+        "mes": measureInterval,
+        "moi": [_moistureRange.start.round(), _moistureRange.end.round()],
+        "wat": wateringDuration,
+        "sen": sendInterval,
+        "lux": 1,
+        "wai": wateringInterval,
+      };
+    }
 
     widget.onSubmit(_ssidController.text, _passController.text, config);
   }
