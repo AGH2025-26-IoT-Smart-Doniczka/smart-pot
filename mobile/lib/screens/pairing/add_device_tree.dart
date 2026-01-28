@@ -77,9 +77,17 @@ class _DeviceTreeState extends State<DeviceTree> {
         throw Exception("Użytkownik nie jest zalogowany. ");
       }
 
-      final potId = _connectedDevice!.id.replaceAll(':', '');
-      print(_connectedDevice!.id);
-      print(potId);
+      final deviceName = _connectedDevice!.name;
+      String potId;
+      if (deviceName.startsWith("PROV_")) {
+        potId = deviceName.replaceFirst("PROV_", "");
+      } else {
+        potId = _connectedDevice!.id.replaceAll(':', '');
+      }
+
+      print("Device ID: ${_connectedDevice!.id}");
+      print("Device Name: $deviceName");
+      print("Resolved Pot ID: $potId");
 
       Map<String, dynamic> pairingData = await context
           .read<PotsController>()
