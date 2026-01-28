@@ -15,6 +15,8 @@ class _WifiFormState extends State<WifiForm> {
   final _passController = TextEditingController();
 
   final _measureIntervalController = TextEditingController(text: "3600");
+  final _sendIntervalController = TextEditingController(text: "7200");
+  final _wateringIntervalController = TextEditingController(text: "0");
   final _wateringDurationController = TextEditingController(text: "5");
   RangeValues _moistureRange = const RangeValues(20, 60);
 
@@ -59,6 +61,17 @@ class _WifiFormState extends State<WifiForm> {
             ),
           ),
           SizedBox(height: 15),
+
+          TextField(
+            controller: _sendIntervalController,
+             keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: "Częstotliwość wysyłania (s)",
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.cloud_upload),
+            ),
+          ),
+          SizedBox(height: 15),
            
           Text("Zakres wilgotności: ${_moistureRange.start.round()}% - ${_moistureRange.end.round()}%"),
           RangeSlider(
@@ -75,6 +88,17 @@ class _WifiFormState extends State<WifiForm> {
                 _moistureRange = values;
               });
             },
+          ),
+          SizedBox(height: 15),
+
+          TextField(
+            controller: _wateringIntervalController,
+             keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: "Interwał podlewania (s, 0=wył)",
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.schedule),
+            ),
           ),
           SizedBox(height: 15),
           
@@ -116,6 +140,18 @@ class _WifiFormState extends State<WifiForm> {
       return;
     }
 
+    final int? sendInterval = int.tryParse(_sendIntervalController.text);
+    if (sendInterval == null || sendInterval < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Błędny czas wysyłania")));
+      return;
+    }
+
+    final int? wateringInterval = int.tryParse(_wateringIntervalController.text);
+    if (wateringInterval == null || wateringInterval < 0) {
+       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Błędny interwał podlewania")));
+       return;
+    }
+
     final int? wateringDuration = int.tryParse(_wateringDurationController.text);
     if (wateringDuration == null || wateringDuration < 0) {
        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Błędny czas podlewania")));
@@ -126,9 +162,9 @@ class _WifiFormState extends State<WifiForm> {
       "mes": measureInterval,
       "moi": [_moistureRange.start.round(), _moistureRange.end.round()],
       "wat": wateringDuration,
-      "sen": 7200,
+      "sen": sendInterval,
       "lux": 1, 
-      "wai": 0, // Disabled by default for setup? Or maybe give a default. User requested specific fields.
+      "wai": wateringInterval,
     };
 
     widget.onSubmit(_ssidController.text, _passController.text, config);
