@@ -77,7 +77,7 @@ class _DeviceTreeState extends State<DeviceTree> {
     }
   }
 
-  Future<void> _sendWifiConfig(String ssid, String pass, Map<String, dynamic> config) async {
+  Future<void> _sendWifiConfig(String ssid, String pass, Map<String, dynamic>? config) async {
     setState(() {
       _isProcessing = true;
     });
@@ -156,6 +156,7 @@ class _DeviceTreeState extends State<DeviceTree> {
         mqttPass: mqttPass,
         mqttUser: mqttUser,
         customConfig: config,
+        sendConfig: config != null,
       );
 
       await _connectedDevice!.disconnect();
@@ -225,7 +226,11 @@ class _DeviceTreeState extends State<DeviceTree> {
         );
 
       case PairingStep.wifiCredentials:
-        return WifiForm(onSubmit: _sendWifiConfig, isSending: _isProcessing);
+        return WifiForm(
+          onSubmit: _sendWifiConfig,
+          isSending: _isProcessing,
+          isHardReset: _isHardReset,
+        );
 
       case PairingStep.success:
         return Center(

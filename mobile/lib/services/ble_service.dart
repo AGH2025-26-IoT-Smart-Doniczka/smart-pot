@@ -59,6 +59,7 @@ class BleService {
     String? mqttUser,
     String? mqttPass,
     Map<String, dynamic>? customConfig,
+    bool sendConfig = true,
   }) async {
     try {
       await device.writeCharacteristic(
@@ -80,18 +81,20 @@ class BleService {
         );
       }
 
-      List<int> configBytes;
-      if (customConfig != null) {
-        configBytes = utf8.encode(jsonEncode(customConfig));
-      } else {
-        configBytes = _generateDefaultConfig();
-      }
+      if (sendConfig) {
+        List<int> configBytes;
+        if (customConfig != null) {
+          configBytes = utf8.encode(jsonEncode(customConfig));
+        } else {
+          configBytes = _generateDefaultConfig();
+        }
 
-      await device.writeCharacteristic(
-        SERVICE_UUID,
-        CHARACTERISTICS_CONFIG_UUID,
-        configBytes,
-      );
+        await device.writeCharacteristic(
+          SERVICE_UUID,
+          CHARACTERISTICS_CONFIG_UUID,
+          configBytes,
+        );
+      }
     } catch (e) {
       throw Exception('Błąd zapisu konfiguracji: $e');
     }
