@@ -81,6 +81,7 @@ class _PotDetailScreenState extends State<PotDetailScreen> {
 
     final role = viewPot.role;
     final hasMeasurement = viewPot.timeStamp != 'Time not specified';
+    final isActive = viewPot.isActive;
     final isHappy = hasMeasurement && viewPot.data.soilMoisture > 30;
     final measureInterval = viewPot.config.measureIntervalSec;
     final sendInterval = viewPot.config.sendIntervalSec;
@@ -181,32 +182,34 @@ class _PotDetailScreenState extends State<PotDetailScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _buildConfigInfoChip(
-                        context,
-                        icon: Icons.sensors,
-                        label: _formatInterval(measureInterval),
-                      ),
-                      const SizedBox(width: 12),
-                      _buildConfigInfoChip(
-                        context,
-                        icon: Icons.cloud_upload,
-                        label: _formatInterval(sendInterval),
-                      ),
-                      if (wateringInterval != null) ...[
+                      if (isActive) ...[
+                        _buildConfigInfoChip(
+                          context,
+                          icon: Icons.sensors,
+                          label: _formatInterval(measureInterval),
+                        ),
                         const SizedBox(width: 12),
                         _buildConfigInfoChip(
                           context,
-                          icon: Icons.water_drop,
-                          label: _formatInterval(wateringInterval),
+                          icon: Icons.cloud_upload,
+                          label: _formatInterval(sendInterval),
                         ),
-                      ],
-                      if (wateringDuration != null) ...[
-                        const SizedBox(width: 12),
-                        _buildConfigInfoChip(
-                          context,
-                          icon: Icons.timer,
-                          label: _formatDurationSeconds(wateringDuration),
-                        ),
+                        if (wateringInterval != null) ...[
+                          const SizedBox(width: 12),
+                          _buildConfigInfoChip(
+                            context,
+                            icon: Icons.water_drop,
+                            label: _formatInterval(wateringInterval),
+                          ),
+                        ],
+                        if (wateringDuration != null) ...[
+                          const SizedBox(width: 12),
+                          _buildConfigInfoChip(
+                            context,
+                            icon: Icons.timer,
+                            label: _formatDurationSeconds(wateringDuration),
+                          ),
+                        ],
                       ],
                     ],
                   ),
@@ -215,7 +218,7 @@ class _PotDetailScreenState extends State<PotDetailScreen> {
             ),
 
             // Sekcja podlewania
-            if (role == PotRole.editor || role == PotRole.owner)
+            if ((role == PotRole.editor || role == PotRole.owner) && isActive)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                 child: Row(
@@ -495,4 +498,6 @@ class _PotDetailScreenState extends State<PotDetailScreen> {
       return 'Błąd daty';
     }
   }
+
+  // Removal of archived connections is handled in the config screen.
 }

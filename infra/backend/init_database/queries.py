@@ -45,6 +45,10 @@ queries = [
     ADD COLUMN IF NOT EXISTS watering_duration_sec INTEGER;
     """,
     """
+    ALTER TABLE pots
+    ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
+    """,
+    """
     CREATE TABLE IF NOT EXISTS connections (
         user_id UUID NOT NULL REFERENCES users(user_id),
         pot_id TEXT NOT NULL REFERENCES pots(pot_id),
@@ -76,5 +80,32 @@ queries = [
         label TEXT,
         payload JSONB
     )
+    """,
+    """
+    ALTER TABLE connections
+    DROP CONSTRAINT IF EXISTS connections_pot_id_fkey;
+    """,
+    """
+    ALTER TABLE connections
+    ADD CONSTRAINT connections_pot_id_fkey
+    FOREIGN KEY (pot_id) REFERENCES pots(pot_id) ON UPDATE CASCADE;
+    """,
+    """
+    ALTER TABLE measures
+    DROP CONSTRAINT IF EXISTS measures_pot_id_fkey;
+    """,
+    """
+    ALTER TABLE measures
+    ADD CONSTRAINT measures_pot_id_fkey
+    FOREIGN KEY (pot_id) REFERENCES pots(pot_id) ON UPDATE CASCADE;
+    """,
+    """
+    ALTER TABLE pot_logs
+    DROP CONSTRAINT IF EXISTS pot_logs_pot_id_fkey;
+    """,
+    """
+    ALTER TABLE pot_logs
+    ADD CONSTRAINT pot_logs_pot_id_fkey
+    FOREIGN KEY (pot_id) REFERENCES pots(pot_id) ON UPDATE CASCADE;
     """,
 ]

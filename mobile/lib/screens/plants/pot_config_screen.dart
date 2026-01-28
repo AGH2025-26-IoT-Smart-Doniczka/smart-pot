@@ -205,6 +205,41 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
     }
   }
 
+  Future<void> _saveNameOnly() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    final trimmedName = _nameController.text.trim();
+    final nameToSend = trimmedName.isEmpty ? null : trimmedName;
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      await context.read<PotsController>().renamePot(
+        widget.pot.potId,
+        nameToSend,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Nazwa została zapisana.')));
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Nie udało się zapisać nazwy: $e')),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isSaving = false;
+      });
+    }
+  }
+
   Future<void> _disconnectPot({required bool isOwner}) async {
     final shouldDisconnect = await _confirmDisconnect(isOwner: isOwner);
     if (!shouldDisconnect) return;
@@ -217,8 +252,8 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
     try {
       if (isOwner) {
         await context.read<PotsController>().disconnectResetPot(
-              widget.pot.potId,
-            );
+          widget.pot.potId,
+        );
       } else {
         await context.read<PotsController>().disconnectPot(widget.pot.potId);
       }
@@ -265,6 +300,7 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
     final role = viewPot.role != PotRole.unknown
         ? viewPot.role
         : _resolveRole(viewPot, currentUserId);
+    final isActive = viewPot.isActive;
 
     if (role == PotRole.viewer || role == PotRole.unknown) {
       return const Scaffold(
@@ -294,27 +330,49 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
               ],
             )
           : SafeArea(child: _buildConfigurationForm(viewPot)),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: FilledButton.icon(
-            onPressed: _isDisconnecting
-                ? null
-                : () => _disconnectPot(isOwner: isOwner),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-              foregroundColor: Theme.of(context).colorScheme.onError,
+      bottomNavigationBar: isActive
+          ? SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: FilledButton.icon(
+                  onPressed: _isDisconnecting
+                      ? null
+                      : () => _disconnectPot(isOwner: isOwner),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.error,
+                    foregroundColor: Theme.of(context).colorScheme.onError,
+                  ),
+                  icon: const Icon(Icons.link_off),
+                  label: Text(
+                    _isDisconnecting
+                        ? 'Rozłączanie...'
+                        : (isOwner ? 'Rozłącz i resetuj' : 'Rozłącz doniczkę'),
+                  ),
+                ),
+              ),
+            )
+          : SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: FilledButton.icon(
+                  onPressed: _isDisconnecting
+                      ? null
+                      : (isOwner ? _confirmDelete : _confirmRemoveConnection),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.error,
+                    foregroundColor: Theme.of(context).colorScheme.onError,
+                  ),
+                  icon: Icon(isOwner ? Icons.delete : Icons.link_off),
+                  label: Text(
+                    _isDisconnecting
+                        ? (isOwner ? 'Usuwanie...' : 'Usuwanie...')
+                        : (isOwner ? 'Usuń doniczkę' : 'Usuń z mojej listy'),
+                  ),
+                ),
+              ),
             ),
-            icon: const Icon(Icons.link_off),
-            label: Text(
-              _isDisconnecting
-                  ? 'Rozłączanie...'
-                  : (isOwner ? 'Rozłącz i resetuj' : 'Rozłącz doniczkę'),
-            ),
-          ),
-        ),
-      ),
     );
 
     return isOwner
@@ -323,6 +381,39 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
   }
 
   Widget _buildConfigurationForm(Pot pot) {
+    if (!pot.isActive) {
+      return SafeArea(
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Text(
+                'Ustawienia ${pot.name}',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 24),
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Nazwa doniczki',
+                  border: OutlineInputBorder(),
+                ),
+                textInputAction: TextInputAction.done,
+                validator: (_) => null,
+              ),
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: _isSaving ? null : _saveNameOnly,
+                icon: const Icon(Icons.save),
+                label: Text(_isSaving ? 'Zapisywanie...' : 'Zapisz nazwę'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return SafeArea(
       child: Form(
         key: _formKey,
@@ -1078,6 +1169,106 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
           },
         ) ??
         false;
+  }
+
+  Future<void> _confirmDelete() async {
+    final shouldDelete = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) {
+            return AlertDialog(
+              title: const Text('Usunąć doniczkę?'),
+              content: const Text(
+                'Ta operacja jest nieodwracalna. Doniczka zostanie usunięta z bazy.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('Anuluj'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  child: const Text('Usuń'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+    if (!shouldDelete || !mounted) return;
+
+    setState(() {
+      _isDisconnecting = true;
+    });
+
+    try {
+      await context.read<PotsController>().deletePot(widget.pot.potId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Doniczka została usunięta.')),
+      );
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Nie udało się usunąć doniczki: $e')),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isDisconnecting = false;
+      });
+    }
+  }
+
+  Future<void> _confirmRemoveConnection() async {
+    final shouldRemove = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) {
+            return AlertDialog(
+              title: const Text('Usunąć doniczkę z listy?'),
+              content: const Text(
+                'Stracisz dostęp do historii tej doniczki.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('Anuluj'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  child: const Text('Usuń'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+    if (!shouldRemove || !mounted) return;
+
+    setState(() {
+      _isDisconnecting = true;
+    });
+
+    try {
+      await context.read<PotsController>().removeSelfConnection(
+        widget.pot.potId,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Dostęp został usunięty.')),
+      );
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Nie udało się usunąć dostępu: $e')),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isDisconnecting = false;
+      });
+    }
   }
 
   Future<int?> _showDurationPicker(

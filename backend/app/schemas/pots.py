@@ -105,10 +105,22 @@ class PotListItemResponse(BaseModel):
     name: str
     last_measure: dict | None
     config: PotConfigResponse
+    is_active: bool
 
 
 class PotListResponse(BaseModel):
     pots: list[PotListItemResponse]
+
+
+class PotRenameRequest(BaseModel):
+    pot_name: Optional[str] = None
+
+    @field_validator("pot_name")
+    @classmethod
+    def pot_name_non_empty(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not v.strip():
+            raise ValueError("pot_name cannot be empty")
+        return v
 
 
 class ChangeOwnerRequest(BaseModel):

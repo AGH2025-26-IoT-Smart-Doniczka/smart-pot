@@ -116,6 +116,24 @@ class PotsController extends ChangeNotifier {
     String potId,
     Map<String, dynamic> payload,
   ) async {
+    final existing = _pots.firstWhere(
+      (pot) => pot.potId == potId,
+      orElse: () => Pot(
+        id: potId,
+        potId: potId,
+        timeStamp: 'Time not specified',
+        data: PotData(),
+        userId: '',
+        role: PotRole.unknown,
+        name: potId,
+        config: PotConfig.fromJson(null, potId),
+        connections: const [],
+        isActive: true,
+      ),
+    );
+    if (!existing.isActive) {
+      throw Exception("Doniczka jest nieaktywna");
+    }
     final user = _authController.currentUser;
     if (user == null) {
       throw Exception("Użytkownik nie jest zalogowany");
@@ -152,6 +170,44 @@ class PotsController extends ChangeNotifier {
 
     if (response.statusCode != 202) {
       throw Exception("Błąd zapisu konfiguracji: ${response.statusCode}");
+    }
+
+    await fetchPots();
+  }
+
+  Future<void> renamePot(String potId, String? potName) async {
+    final user = _authController.currentUser;
+    if (user == null) {
+      throw Exception("Użytkownik nie jest zalogowany");
+    }
+
+    final url = Uri.parse('$_baseUrl/pots/$potId/name');
+    final response = await http.patch(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${user.token}',
+      },
+      body: json.encode({'pot_name': potName}),
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      String details = '';
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          details = decoded['detail']?.toString() ?? '';
+        } else if (decoded is String) {
+          details = decoded;
+        }
+      } catch (_) {
+        details = response.body;
+      }
+      throw Exception(
+        details.isNotEmpty
+            ? "Błąd zmiany nazwy: ${response.statusCode} ($details)"
+            : "Błąd zmiany nazwy: ${response.statusCode}",
+      );
     }
 
     await fetchPots();
@@ -482,6 +538,42 @@ class PotsController extends ChangeNotifier {
     await fetchPotConnections(potId);
   }
 
+  Future<void> removeSelfConnection(String potId) async {
+    final user = _authController.currentUser;
+    if (user == null) {
+      throw Exception("Użytkownik nie jest zalogowany");
+    }
+
+    final url = Uri.parse('$_baseUrl/pots/$potId/connections');
+    final request = http.Request('DELETE', url);
+    request.headers.addAll({
+      'Authorization': 'Bearer ${user.token}',
+    });
+
+    final response = await request.send();
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final body = await response.stream.bytesToString();
+      String details = '';
+      try {
+        final decoded = jsonDecode(body);
+        if (decoded is Map<String, dynamic>) {
+          details = decoded['detail']?.toString() ?? '';
+        } else if (decoded is String) {
+          details = decoded;
+        }
+      } catch (_) {
+        details = body;
+      }
+      throw Exception(
+        details.isNotEmpty
+            ? "Błąd rozłączania: ${response.statusCode} ($details)"
+            : "Błąd rozłączania: ${response.statusCode}",
+      );
+    }
+
+    await fetchPots();
+  }
+
   Future<void> fetchPotConnections(String potId) async {
     final user = _authController.currentUser;
     if (user == null) {
@@ -517,6 +609,7 @@ class PotsController extends ChangeNotifier {
       name: existing.name,
       config: existing.config,
       connections: connections,
+      isActive: existing.isActive,
     );
     notifyListeners();
   }
@@ -558,5 +651,39 @@ class PotsController extends ChangeNotifier {
             : "Błąd podlewania: ${response.statusCode}",
       );
     }
+  }
+
+  Future<void> deletePot(String potId) async {
+    final user = _authController.currentUser;
+    if (user == null) {
+      throw Exception("Użytkownik nie jest zalogowany");
+    }
+
+    final url = Uri.parse('$_baseUrl/pots/$potId');
+    final response = await http.delete(
+      url,
+      headers: {'Authorization': 'Bearer ${user.token}'},
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      String details = '';
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          details = decoded['detail']?.toString() ?? '';
+        } else if (decoded is String) {
+          details = decoded;
+        }
+      } catch (_) {
+        details = response.body;
+      }
+      throw Exception(
+        details.isNotEmpty
+            ? "Błąd usuwania doniczki: ${response.statusCode} ($details)"
+            : "Błąd usuwania doniczki: ${response.statusCode}",
+      );
+    }
+
+    await fetchPots();
   }
 }
