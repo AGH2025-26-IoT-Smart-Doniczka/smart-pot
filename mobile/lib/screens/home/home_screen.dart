@@ -47,21 +47,23 @@ class _HomeScreenState extends State<HomeScreen> {
                     if (ctrl.isLoading) {
                       return Center(child: CircularProgressIndicator());
                     }
-                    if (ctrl.pots.isEmpty) {
+                    final activePots =
+                        ctrl.pots.where((pot) => pot.isActive).toList();
+                    if (activePots.isEmpty) {
                       return const Center(
                         child: Text("Brak doniczek. Dodaj pierwszą!"),
                       );
                     }
                     return ListView.builder(
                       scrollDirection: Axis.horizontal,
-                      itemCount: ctrl.pots.length,
+                      itemCount: activePots.length,
                       itemBuilder: (context, index) {
-                        final pot = ctrl.pots[index];
+                        final pot = activePots[index];
                         final hasMeasurement =
                             pot.timeStamp != 'Time not specified';
                         return Padding(
                           padding: EdgeInsets.only(
-                            right: index == ctrl.pots.length - 1 ? 0 : 12,
+                            right: index == activePots.length - 1 ? 0 : 12,
                           ),
                           // TODO: trzeba jeszcze określić co to ma wyświetlać
                           child: PotMiniCard(
