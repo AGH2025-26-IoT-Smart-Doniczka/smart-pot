@@ -24,6 +24,8 @@ class _DeviceTreeState extends State<DeviceTree> {
 
   String _errorMessage = "";
   bool _isProcessing = false;
+  String? _detectedPotId;
+  bool _isHardReset = false;
 
   Future<void> _connectToDevice(BleDevice device) async {
     setState(() {
@@ -39,6 +41,19 @@ class _DeviceTreeState extends State<DeviceTree> {
       }
 
       _connectedDevice = device;
+
+      try {
+        final result = await BleService().readResetCharacteristic(device.id);
+        _detectedPotId = result.potId;
+        _isHardReset = result.isHardReset;
+        debugPrint(
+          "Detected Pot ID: $_detectedPotId, Hard Reset: $_isHardReset",
+        );
+      } catch (e) {
+        debugPrint("Could not read reset characteristic: $e");
+        _detectedPotId = null;
+        _isHardReset = false;
+      }
 
       if (!await device.isBonded) {
         try {
@@ -79,10 +94,16 @@ class _DeviceTreeState extends State<DeviceTree> {
 
       final deviceName = _connectedDevice!.name;
       String potId;
-      if (deviceName.startsWith("PROV_")) {
+      if (_detectedPotId != null) {
+        potId = _detectedPotId!;
+      } else if (deviceName.startsWith("PROV_")) {
         potId = deviceName.replaceFirst("PROV_", "");
       } else {
         potId = _connectedDevice!.id.replaceAll(':', '');
+      }
+
+      if (_isHardReset) {
+        await context.read<PotsController>().notifyHardReset(potId);
       }
 
       print("Device ID: ${_connectedDevice!.id}");
