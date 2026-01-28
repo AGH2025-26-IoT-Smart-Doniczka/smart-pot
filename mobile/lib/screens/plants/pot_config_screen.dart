@@ -216,7 +216,9 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
 
     try {
       if (isOwner) {
-        await context.read<PotsController>().hardResetPot(widget.pot.potId);
+        await context.read<PotsController>().disconnectResetPot(
+              widget.pot.potId,
+            );
       } else {
         await context.read<PotsController>().disconnectPot(widget.pot.potId);
       }
@@ -225,7 +227,7 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
         SnackBar(
           content: Text(
             isOwner
-                ? 'Doniczka została usunięta i zresetowana.'
+                ? 'Doniczka została rozłączona i zresetowana.'
                 : 'Doniczka została rozłączona.',
           ),
         ),
@@ -237,7 +239,7 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
         SnackBar(
           content: Text(
             isOwner
-                ? 'Nie udało się usunąć doniczki: $e'
+                ? 'Nie udało się rozłączyć i zresetować doniczki: $e'
                 : 'Nie udało się rozłączyć: $e',
           ),
         ),
@@ -307,8 +309,8 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
             icon: const Icon(Icons.link_off),
             label: Text(
               _isDisconnecting
-                  ? (isOwner ? 'Usuwanie...' : 'Rozłączanie...')
-                  : (isOwner ? 'Usuń doniczkę' : 'Rozłącz doniczkę'),
+                  ? 'Rozłączanie...'
+                  : (isOwner ? 'Rozłącz i resetuj' : 'Rozłącz doniczkę'),
             ),
           ),
         ),
@@ -1028,7 +1030,9 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
               builder: (context, setDialogState) {
                 return AlertDialog(
                   title: Text(
-                    isOwner ? 'Usunąć doniczkę?' : 'Rozłączyć doniczkę?',
+                    isOwner
+                        ? 'Rozłączyć i zresetować doniczkę?'
+                        : 'Rozłączyć doniczkę?',
                   ),
                   content: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -1036,7 +1040,7 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
                     children: [
                       Text(
                         isOwner
-                            ? 'Ta operacja jest nieodwracalna. Doniczka zostanie usunięta i zresetowana do ustawień fabrycznych.'
+                            ? 'Ta operacja jest nieodwracalna. Połączenia z doniczką zostaną usunięte i zostanie wysłany twardy reset.'
                             : 'Ta operacja jest nieodwracalna. Doniczka zostanie odłączona od konta.',
                       ),
                       const SizedBox(height: 12),
@@ -1044,7 +1048,7 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
                         contentPadding: EdgeInsets.zero,
                         title: Text(
                           isOwner
-                              ? 'Rozumiem, że to spowoduje twardy reset.'
+                              ? 'Rozumiem, że to spowoduje twardy reset i usunięcie połączeń.'
                               : 'Rozumiem, że tej operacji nie można cofnąć.',
                         ),
                         value: acknowledged,
@@ -1065,7 +1069,7 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
                       onPressed: acknowledged
                           ? () => Navigator.of(dialogContext).pop(true)
                           : null,
-                      child: Text(isOwner ? 'Usuń' : 'Rozłącz'),
+                      child: Text(isOwner ? 'Rozłącz i resetuj' : 'Rozłącz'),
                     ),
                   ],
                 );
