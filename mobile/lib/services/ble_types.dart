@@ -28,6 +28,11 @@ abstract class BleDevice {
     String characteristicUuid,
     List<int> value,
   );
+
+  Future<List<int>> readCharacteristic(
+    String serviceUuid,
+    String characteristicUuid,
+  );
 }
 
 abstract class BleAdapter {

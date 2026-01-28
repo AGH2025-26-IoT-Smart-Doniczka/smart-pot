@@ -13,8 +13,44 @@ class BleService {
   static const String CHARACTERISTICS_MQTT_PASS =
       "5befb657-9ba7-4f37-8954-d8fc9ca0346c";
 
+  static const String CHARACTERISTICS_RESET_UUID =
+      "896a511e-7016-4a98-a001-dcc96b403ebd";
+
   static const String CHARACTERISTICS_CONFIG_UUID =
       '043df643-b3df-1dbd-0547-f926cee23429';
+
+  Future<({String potId, bool isHardReset})> readResetCharacteristic(
+    String deviceId,
+  ) async {
+    final connectedDevices = await bleAdapter.getConnectedDevices();
+    BleDevice? device;
+    try {
+      device = connectedDevices.firstWhere((d) => d.id == deviceId);
+    } catch (_) {
+      throw Exception("Device $deviceId not connected");
+    }
+
+    final value = await device.readCharacteristic(
+      SERVICE_UUID,
+      CHARACTERISTICS_RESET_UUID,
+    );
+
+    if (value.length < 13) {
+      throw Exception(
+        "Invalid reset characteristic length: ${value.length}. Expected 13.",
+      );
+    }
+
+    // Bytes 0-11: MAC Address (ASCII)
+    final potIdBytes = value.sublist(0, 12);
+    final potId = utf8.decode(potIdBytes);
+
+    // Byte 12: Reset flag (0 = Hard Reset, 1 = No Reset)
+    final resetFlag = value[12];
+    final isHardReset = resetFlag == 0;
+
+    return (potId: potId, isHardReset: isHardReset);
+  }
 
   Future<void> writeConfiguration({
     required BleDevice device,

@@ -71,6 +71,33 @@ class _WebBleDevice implements BleDevice {
       js_util.callMethod(characteristic, 'writeValue', [bytes]),
     );
   }
+
+  @override
+  Future<List<int>> readCharacteristic(
+    String serviceUuid,
+    String characteristicUuid,
+  ) async {
+    if (!await isConnected) {
+      await connect();
+    }
+
+    final server = _server ?? js_util.getProperty(_device, 'gatt');
+    final service = await js_util.promiseToFuture(
+      js_util.callMethod(server, 'getPrimaryService', [serviceUuid]),
+    );
+    final characteristic = await js_util.promiseToFuture(
+      js_util.callMethod(service, 'getCharacteristic', [characteristicUuid]),
+    );
+
+    final dataView = await js_util.promiseToFuture(
+      js_util.callMethod(characteristic, 'readValue', []),
+    );
+    
+    // Convert DataView to List<int>
+    final buffer = js_util.getProperty(dataView, 'buffer');
+    final uint8Array = Uint8List.view(buffer);
+    return uint8Array.toList();
+  }
 }
 
 class _WebBleAdapter implements BleAdapter {

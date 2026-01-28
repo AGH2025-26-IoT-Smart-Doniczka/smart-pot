@@ -62,6 +62,29 @@ class _FlutterBlueBleDevice implements BleDevice {
 
     await characteristic.write(value);
   }
+
+  @override
+  Future<List<int>> readCharacteristic(
+    String serviceUuid,
+    String characteristicUuid,
+  ) async {
+    final services = await _device.discoverServices();
+    final service = services.firstWhere(
+      (s) => s.uuid.toString() == serviceUuid,
+      orElse: () => throw Exception(
+        'Nie znaleziono serwisu konfiguracyjnego na urządzeniu',
+      ),
+    );
+
+    final characteristic = service.characteristics.firstWhere(
+      (c) => c.uuid.toString() == characteristicUuid,
+      orElse: () => throw Exception(
+        'Błąd odczytu charakterystyki: $characteristicUuid',
+      ),
+    );
+
+    return await characteristic.read();
+  }
 }
 
 class _FlutterBlueBleAdapter implements BleAdapter {

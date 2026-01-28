@@ -210,6 +210,32 @@ class PotsController extends ChangeNotifier {
     await fetchPots();
   }
 
+  Future<void> notifyHardReset(String potId) async {
+    final user = _authController.currentUser;
+    if (user == null) {
+      throw Exception("Użytkownik nie jest zalogowany");
+    }
+
+    // Zgodnie ze specyfikacją, używamy tego samego endpointu co przy ręcznym hard reset
+    final url = Uri.parse('$_baseUrl/pots/$potId/hard-reset');
+    
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Authorization': 'Bearer ${user.token}'},
+      );
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        debugPrint("Notify Hard Reset failed: ${response.statusCode}");
+        // Nie rzucamy wyjątku, aby nie przerywać parowania, ale logujemy błąd
+      } else {
+        debugPrint("Notify Hard Reset successful for $potId");
+      }
+    } catch (e) {
+      debugPrint("Notify Hard Reset error: $e");
+    }
+  }
+
   Future<List<PotHistoryPoint>> fetchPotHistory({
     required String potId,
     required DateTime from,
