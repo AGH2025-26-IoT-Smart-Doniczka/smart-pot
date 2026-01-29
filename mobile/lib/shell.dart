@@ -36,6 +36,13 @@ class _MainShellState extends State<MainShell> {
         //ikony po prawej
         actions: [
           IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              context.read<PotsController>().fetchPots();
+              context.read<PotsController>().fetchAlerts();
+            },
+          ),
+          IconButton(
             icon: Icon(theme.isDark ? Icons.light_mode : Icons.dark_mode),
             onPressed: () {
               context.read<ThemeController>().toggle();

@@ -27,6 +27,7 @@ from ..integrations.repositories.pots import (
     set_mqtt_password,
     get_history_measures,
     get_history_measures_aggregated,
+    get_user_pot_logs,
     update_config,
     update_owner_connection,
     get_user_pots,
@@ -237,6 +238,16 @@ def get_measures(
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ve))
     return {"pot_id": pot_id, "count": count, "measures": measures}
+
+
+@router.get("/logs")
+def get_user_logs(
+    count: int = Query(20, ge=1, le=200),
+    authorization: str | None = Header(default=None),
+):
+    user_id = get_user_id_from_auth(authorization)
+    logs = get_user_pot_logs(user_id=user_id, count=count)
+    return {"count": count, "logs": json_safe(logs)}
 
 
 @router.post("/{pot_id}/actions/water", status_code=status.HTTP_202_ACCEPTED)

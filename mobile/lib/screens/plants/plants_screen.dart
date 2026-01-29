@@ -19,12 +19,6 @@ class MyPotsScreen extends StatelessWidget {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Moje rośliny'),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: () => {context.read<PotsController>().fetchPots()},
-            ),
-          ],
           bottom: const TabBar(
             tabs: [
               Tab(text: 'Aktywne'),

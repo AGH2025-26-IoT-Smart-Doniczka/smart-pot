@@ -80,7 +80,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => PotDetailScreen(pot: pot),
+                                  builder: (context) =>
+                                      PotDetailScreen(pot: pot),
                                 ),
                               );
                             },
@@ -92,7 +93,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               SizedBox(height: 20),
-              Text("Alerty", style: Theme.of(context).textTheme.headlineSmall),
+              Text(
+                "Alerty",
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
               SizedBox(height: 20),
               AlertsContainer(),
               SizedBox(height: floatingButtonZoneHeight),

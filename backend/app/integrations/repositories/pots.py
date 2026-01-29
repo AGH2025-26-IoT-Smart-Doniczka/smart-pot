@@ -291,6 +291,49 @@ def pot_logs_insert(
         raise e
 
 
+def get_user_pot_logs(user_id: str, count: int) -> list[dict[str, Any]]:
+    conn = get_connection()
+    try:
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT
+                        l.id,
+                        l.pot_id,
+                        l.timestamp,
+                        l.label,
+                        l.payload,
+                        p.pot_name
+                    FROM pot_logs l
+                    JOIN connections c ON c.pot_id = l.pot_id
+                    JOIN pots p ON p.pot_id = l.pot_id
+                    WHERE c.user_id = %s
+                    ORDER BY l.timestamp DESC
+                    LIMIT %s;
+                    """,
+                    (user_id, count),
+                )
+                rows = cur.fetchall()
+                logs: list[dict[str, Any]] = []
+                for row in rows:
+                    logs.append(
+                        {
+                            "id": row["id"],
+                            "pot_id": row["pot_id"],
+                            "pot_name": row["pot_name"] or row["pot_id"],
+                            "timestamp": row["timestamp"].isoformat()
+                            if isinstance(row["timestamp"], datetime)
+                            else row["timestamp"],
+                            "label": row["label"],
+                            "payload": row["payload"],
+                        }
+                    )
+                return logs
+    finally:
+        conn.close()
+
+
 def get_history_measures(pot_id: str, count: int) -> list[dict[str, Any]]:
     if not pot_exists(pot_id):
         raise ValueError(f"Pot with id {pot_id} does not exist")
