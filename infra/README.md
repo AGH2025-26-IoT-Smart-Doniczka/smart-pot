@@ -4,7 +4,7 @@ Container and orchestration assets. Keep Dockerfiles, docker-compose.yml, env sa
 
 ## MQTT
 
-This system uses the Eclipse Mosquitto MQTT broker (Dockerized) and a simple, scalable three-topic model for each ESP32 device.
+This system uses the Eclipse Mosquitto MQTT broker (Dockerized) and a simple, scalable topic model for each ESP32 device.
 
 ## 1. Topics
 
@@ -13,15 +13,20 @@ This system uses the Eclipse Mosquitto MQTT broker (Dockerized) and a simple, sc
 - `devices/<uuid>/telemetry`
   - ESP publishes sensor telemetry data to the backend.
 
-- `devices/<uuid>/setup`
-  - ESP publishes setup-related information.
-  - Used for example in pairing requests.
+- `devices/<uuid>/logs`
+  - ESP publishes device logs and events.
 
 ### Server -> ESP
 
-- devices/\<uuid>/config
+- `devices/<uuid>/config`
   - Backend publishes configuration updates.
   - ESP updates its internal config upon receiving this payload.
+
+- `devices/<uuid>/actions`
+  - Backend publishes actions such as watering.
+
+- `devices/<uuid>/hard-reset`
+  - Backend publishes hard reset action.
 
 ## 2. Device Identity
 
@@ -50,8 +55,10 @@ ACL Pattern Rules (with username = `<uuid>`):
 
 ```text
 pattern write devices/%u/telemetry
-pattern write devices/%u/setup
+pattern write devices/%u/logs
 pattern read  devices/%u/config
+pattern read  devices/%u/actions
+pattern read  devices/%u/hard-reset
 ```
 
 This enforces:
@@ -60,13 +67,15 @@ This enforces:
 
     ```text
     devices/<uuid>/telemetry
-    devices/<uuid>/setup
+    devices/<uuid>/logs
     ```
 
 - ESP can subscribe only to:
 
     ```text
     devices/<uuid>/config
+    devices/<uuid>/actions
+    devices/<uuid>/hard-reset
     ```
 
 - No cross-device access is possible.
@@ -96,8 +105,10 @@ The ESP32 must:
 
     ```text
     String topicTelemetry = "devices/" + uuid + "/telemetry";
-    String topicSetup     = "devices/" + uuid + "/setup";
+    String topicLogs      = "devices/" + uuid + "/logs";
     String topicConfig    = "devices/" + uuid + "/config";
+    String topicActions   = "devices/" + uuid + "/actions";
+    String topicHardReset = "devices/" + uuid + "/hard-reset";
     ```
 
 4. Publish structured JSON payloads.
@@ -106,29 +117,24 @@ The ESP32 must:
 
 ```json
 {
-    "type": "telemetry",
-    "version": 1,
+    "ts": 1712345678,
     "data": {
-        "potId": "str",
-        "airTemp": 0.0, 
-        "airHumidity": 0.0, 
-        "airPressure": 0.0, 
-        "soilMoisture": 0.0, 
-        "illuminance": 0.0
+        "lux": 123,
+        "tem": 22.5,
+        "moi": 42,
+        "pre": 1003
     }
 }
 ```
 
-### Setup Payload Example
+### Logs Payload Example
 
 ```json
 {
-    "type": "pairing",
-    "version": 1,
-    "data": {
-        "potId": "str",
-        "email": "str"
-    }
+    "ts": 1712345678,
+    "lab": "watering",
+    "lvl": 2,
+    "data": "watering completed"
 }
 ```
 
@@ -136,10 +142,22 @@ The ESP32 must:
 
 ```json
 {
-    "type": "config",
-    "version": 1,
+    "lux": 1,
+    "moi": [20, 80],
+    "tem": [18.0, 28.5],
+    "mes": 300,
+    "sen": 300,
+    "wat": 3600
+}
+```
+
+### Actions Payload Example (Server -> ESP)
+
+```json
+{
+    "typ": "wtr",
     "data": {
-        "sleepTime": 1800
+        "dur": 10
     }
 }
 ```
@@ -152,13 +170,20 @@ The backend:
 
     ```text
     devices/+/telemetry
-    devices/+/setup
+    devices/+/logs
+    devices/+/hard-reset
     ```
 
 - Publishes config to:
 
     ```text
     devices/<uuid>/config
+    ```
+
+- Publishes actions to:
+
+    ```text
+    devices/<uuid>/actions
     ```
 
 ## 6. Mosquitto Broker Setup

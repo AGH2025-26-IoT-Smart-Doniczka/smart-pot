@@ -1,0 +1,71 @@
+import os
+import asyncio
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.api.auth import router as auth_router
+from app.api.pots import router as pots_router
+
+from app.integrations.mqtt.MQTTClient import MQTTClient
+from app.domain.telemetry_handler import telemetry_handler
+from app.domain.start_handlers import start_workers
+from app.domain.hard_reset_handler import hard_reset_handler
+from app.domain.logs_handler import logs_handler
+
+mqtt_client = MQTTClient(
+    client_id=os.environ.get("MQTT_CLIENT_ID", "backend-service"),
+    persistent_session=True,
+    session_expiry_interval=24 * 60 * 60,
+)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("Starting application...")
+
+    start_workers()
+
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, mqtt_client.connect)
+
+    await loop.run_in_executor(
+        None, lambda: mqtt_client.subscribe("devices/+/telemetry", telemetry_handler, qos=1)
+    )
+    await loop.run_in_executor(
+        None, lambda: mqtt_client.subscribe("devices/+/logs", logs_handler, qos=1)
+    )
+    await loop.run_in_executor(
+        None, lambda: mqtt_client.subscribe("devices/+/hard-reset", hard_reset_handler, qos=1)
+    )
+
+    yield
+
+    print("Stopping application...")
+    await loop.run_in_executor(None, mqtt_client.disconnect)
+
+
+app = FastAPI(lifespan=lifespan)
+
+cors_origins_env = os.environ.get("CORS_ORIGINS", "*")
+cors_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
+cors_allow_credentials = os.environ.get("CORS_ALLOW_CREDENTIALS", "false").lower() == "true"
+if cors_origins == ["*"]:
+    cors_allow_credentials = False
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=cors_allow_credentials,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(auth_router, prefix="/auth", tags=["auth"])
+app.include_router(pots_router, prefix="/pots", tags=["pots"])
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}

@@ -1,0 +1,9 @@
+psycopg2-binary
+fastapi
+uvicorn[standard]
+pydantic
+pydantic[email]
+passlib[bcrypt]
+argon2_cffi
+PyJWT
+paho-mqtt>=2.1.0

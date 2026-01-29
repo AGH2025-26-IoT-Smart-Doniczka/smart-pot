@@ -7,18 +7,26 @@ Everything is still in **development** and not ready for production use.
 
 This server uses the [Eclipse Mosquitto](https://hub.docker.com/_/eclipse-mosquitto) Docker image.
 
-It is configured to have three topics per ESP device:
+It is configured to have the following topics per ESP device:
 
 1. ESP $\rightarrow$ Server
    1. `devices/<uuid>/telemetry`
 
         This topic is used to transfer sensor telemetry data to the server.
 
-   2. `devices/<uuid>/setup`
+   2. `devices/<uuid>/logs`
 
-        This topic is used to send setup config to the server. Setup configuration can include, for example, a request to pair the device with a client account.
+        This topic is used to send device logs to the server.
 
 2. Server $\rightarrow$ ESP
    1. `devices/<uuid>/config`
 
         This topic is used to remotely configure the device. The ESP changes its internal configuration based on values sent to this topic.
+
+   2. `devices/<uuid>/actions`
+
+        This topic is used to send actions such as watering to the device.
+
+   3. `devices/<uuid>/hard-reset`
+
+        This topic is used to send hard reset actions to the device.

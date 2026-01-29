@@ -1,0 +1,12 @@
+{
+	"topic": "devices/8813BF69B3DA/telemetry",
+	"payload": {
+		"ts": 1768861068,
+		"data": {
+			"lux": 123,
+			"tem": 22.5,
+			"moi": 40,
+			"pre": 1010
+		}
+	}
+}

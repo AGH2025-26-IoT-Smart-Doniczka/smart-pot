@@ -17,7 +17,7 @@
 /* =========================================================================
    SECTION: Constants
    ========================================================================= */
-#define MQTT_BROKER_HOST          "172.20.10.2"
+#define MQTT_BROKER_HOST          "192.168.100.30"
 #define MQTT_BROKER_PORT          1883
 #define MQTT_WATER_GPIO           GPIO_NUM_2
 

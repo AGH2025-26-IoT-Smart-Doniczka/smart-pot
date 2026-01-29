@@ -6,6 +6,7 @@
 #include "fsm_manager.h"
 #include "wifi_manager.h"
 #include "mqtt_manager.h"
+#include "buttons_manager.h"
 #include "fsm_state_callbacks.h"
 
 /* =========================================================================
@@ -17,11 +18,21 @@ static const char *TAG = "STATE_IDLE";
 static esp_timer_handle_t s_idle_timer;
 
 /* =========================================================================
+    SECTION: Forward Declarations
+    ========================================================================= */
+static void idle_timer_start(void);
+static void idle_timer_stop(void);
+
+/* =========================================================================
    SECTION: Helpers
    ========================================================================= */
 static void idle_timeout_cb(void *arg)
 {
     (void)arg;
+    if (buttons_manager_is_any_pressed()) {
+        idle_timer_start();
+        return;
+    }
     (void)fsm_manager_post_event(APP_EVENT_IDLE_TIMEOUT, NULL, 0, 0);
 }
 
@@ -38,6 +49,7 @@ static void idle_timer_start(void)
     }
 
     (void)esp_timer_stop(s_idle_timer);
+    
     (void)esp_timer_start_once(s_idle_timer, (uint64_t)IDLE_TIMEOUT_MS * 1000ULL);
 }
 

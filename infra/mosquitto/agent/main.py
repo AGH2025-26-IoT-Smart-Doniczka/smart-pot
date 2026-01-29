@@ -14,7 +14,7 @@ AGENT_LOGIN = os.environ.get("AGENT_LOGIN", "mqtt-agent")
 AGENT_PASSWORD = os.environ.get("AGENT_PASSWORD", "mqtt-agent-password")
 
 ACL_PATH: str = os.environ.get("ACL_PATH", "/mosquitto/config/acl")
-PASSWD_PATH: str = os.environ.get("PASSWD_PATH", "/mosquitto/config/dev_passwd")
+PASSWD_PATH: str = os.environ.get("PASSWD_PATH", "/mosquitto/config/passwd")
 
 CONTROL_TOPIC: str = os.environ.get("CONTROL_TOPIC", "users/add")
 
