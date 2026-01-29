@@ -3,7 +3,7 @@
 	"payload": {
 		"ts": 1710000000.0,
 		"lab": "startup",
-		"lvl": 2,
+		"lvl": 1,
 		"data": "Boot completed"
 	}
 }

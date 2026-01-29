@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:smart_pot_mobile_app/data/auth_controller.dart';
+import 'package:smart_pot_mobile_app/models/alert_model.dart';
 import 'package:smart_pot_mobile_app/models/pot_data.dart';
 import 'package:smart_pot_mobile_app/models/pot_history.dart';
 import 'package:smart_pot_mobile_app/services/ble_service.dart';
@@ -17,12 +18,100 @@ class PotsController extends ChangeNotifier {
   List<Pot> _pots = [];
   bool _isLoading = false;
   String? _error;
+  List<Alert> _alerts = [];
+  bool _isAlertsLoading = false;
+  String? _alertsError;
 
   List<Pot> get pots => _pots;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  List<Alert> get alerts => _alerts;
+  bool get isAlertsLoading => _isAlertsLoading;
+  String? get alertsError => _alertsError;
 
   PotsController(this._authController);
+
+  AlertType _mapAlertLevel(int level) {
+    switch (level) {
+      case 1:
+        return AlertType.info;
+      case 2:
+        return AlertType.warning;
+      case 3:
+      case 4:
+      default:
+        return AlertType.error;
+    }
+  }
+
+  Future<void> fetchAlerts({int count = 20}) async {
+    final user = _authController.currentUser;
+    if (user == null) {
+      _alertsError = "Użytkownik nie jest zalogowany";
+      _alerts = [];
+      notifyListeners();
+      return;
+    }
+
+    _isAlertsLoading = true;
+    _alertsError = null;
+    notifyListeners();
+
+    try {
+      final url = Uri.parse('$_baseUrl/pots/logs?count=$count');
+      final response = await http.get(
+        url,
+        headers: {'Authorization': 'Bearer ${user.token}'},
+      );
+      if (response.statusCode != 200) {
+        String details = '';
+        try {
+          final decoded = jsonDecode(response.body);
+          if (decoded is Map<String, dynamic>) {
+            details = decoded['detail']?.toString() ?? '';
+          } else if (decoded is String) {
+            details = decoded;
+          }
+        } catch (_) {
+          details = response.body;
+        }
+        _alertsError = details.isNotEmpty
+            ? "Błąd pobierania alertów: ${response.statusCode} ($details)"
+            : "Błąd pobierania alertów: ${response.statusCode}";
+        _alerts = [];
+        return;
+      }
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception("Nieprawidłowa odpowiedź serwera");
+      }
+      final logs = (decoded['logs'] as List<dynamic>?) ?? const [];
+      _alerts = logs
+          .whereType<Map<String, dynamic>>()
+          .map((log) {
+            final payload = log['payload'] as Map<String, dynamic>? ?? const {};
+            final level = payload['lvl'] as int? ?? 4;
+            final message = payload['data']?.toString() ?? '';
+            final potName = log['pot_name']?.toString() ?? log['pot_id']?.toString() ?? '';
+            final timestamp = log['timestamp']?.toString();
+            final date = timestamp != null ? DateTime.parse(timestamp) : DateTime.now();
+            return Alert(
+              title: potName,
+              description: message,
+              dateTime: date,
+              alertType: _mapAlertLevel(level),
+            );
+          })
+          .toList();
+    } catch (e) {
+      _alertsError = "Błąd pobierania alertów: $e";
+      _alerts = [];
+    } finally {
+      _isAlertsLoading = false;
+      notifyListeners();
+    }
+  }
 
   Future<void> fetchPots() async {
     print("Fetching pots...");
