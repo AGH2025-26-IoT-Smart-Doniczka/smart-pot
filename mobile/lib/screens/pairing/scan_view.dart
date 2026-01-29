@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -29,6 +30,8 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
   List<BleDevice> _connectedDevices = [];
   List<BleDevice> _bondedDevices = [];
   final List<BleDevice> _webDevices = [];
+  final LinkedHashMap<String, BleScanResult> _scannedResultsById =
+      LinkedHashMap<String, BleScanResult>();
 
   @override
   void initState() {
@@ -38,7 +41,7 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
 
     if (!kIsWeb) {
       _scanSub = _adapter.scanResults.listen(
-        (results) => debugPrint('scanResults update: ${results.length} items'),
+        _handleScanResults,
         onError: (err) => debugPrint('scanResults error: $err'),
       );
 
@@ -141,8 +144,12 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
 
   Future<void> _startScanning() async {
     try {
+      _scannedResultsById.clear();
       await _adapter.startScan(timeout: const Duration(seconds: 15));
       debugPrint('Scan started');
+      if (mounted) {
+        setState(() {});
+      }
     } catch (e) {
       debugPrint('Error while scanning: $e');
     }
@@ -166,6 +173,42 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
       _webDevices.removeWhere((d) => d.id == device.id);
       _webDevices.add(device);
     });
+  }
+
+  void _handleScanResults(List<BleScanResult> results) {
+    debugPrint('scanResults update: ${results.length} items');
+
+    var changed = false;
+    for (final res in results) {
+      final id = res.device.id;
+      final existing = _scannedResultsById[id];
+
+      if (existing == null) {
+        if (_isNamedScanResult(res)) {
+          _scannedResultsById[id] = res;
+          changed = true;
+        }
+        continue;
+      }
+
+      final shouldUpdate = existing.rssi != res.rssi ||
+          existing.advName != res.advName ||
+          existing.device.name != res.device.name;
+      if (shouldUpdate) {
+        _scannedResultsById[id] = res;
+        changed = true;
+      }
+    }
+
+    if (changed && mounted) {
+      setState(() {});
+    }
+  }
+
+  bool _isNamedScanResult(BleScanResult res) {
+    final advName = res.advName.trim();
+    if (advName.isNotEmpty) return true;
+    return res.device.name.trim() != res.device.id.trim();
   }
 
   @override
@@ -202,82 +245,73 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
           Expanded(
             child: !_permissionsGranted
                 ? _buildPermissionInfo()
-                : StreamBuilder<List<BleScanResult>>(
-                    stream: _adapter.scanResults,
-                    initialData: const [],
-                    builder: (context, snapshot) {
-                      final results = List<BleScanResult>.from(
-                        snapshot.data ?? const [],
-                      );
-                      debugPrint('builder results count: ${results.length}');
-
-                      results.sort((a, b) => b.rssi.compareTo(a.rssi));
-
-                      final knownIds = {
-                        ..._connectedDevices.map((d) => d.id),
-                        ..._bondedDevices.map((d) => d.id),
-                      };
-                      final filteredResults = results
-                          .where((r) => !knownIds.contains(r.device.id))
-                          .toList();
-
-                      final hasConnected = _connectedDevices.isNotEmpty;
-                      final hasBonded = _bondedDevices.isNotEmpty;
-                      final hasScanned = filteredResults.isNotEmpty;
-
-                      if (!hasConnected && !hasBonded && !hasScanned) {
-                        return const Center(
-                          child: Text("Nie znaleziono urządzeń"),
-                        );
-                      }
-
-                      return ListView(
-                        children: [
-                          if (hasConnected) ...[
-                            _buildSectionHeader(
-                              "Połączone urządzenia",
-                              Icons.bluetooth_connected,
-                              Colors.green,
-                            ),
-                            ..._connectedDevices.map(
-                              (device) => _buildKnownDeviceTile(
-                                device,
-                                isConnected: true,
-                              ),
-                            ),
-                            const Divider(thickness: 2),
-                          ],
-                          if (hasBonded) ...[
-                            _buildSectionHeader(
-                              "Sparowane urządzenia",
-                              Icons.bluetooth,
-                              Colors.blue,
-                            ),
-                            ..._bondedDevices.map(
-                              (device) => _buildKnownDeviceTile(
-                                device,
-                                isConnected: false,
-                              ),
-                            ),
-                            const Divider(thickness: 2),
-                          ],
-                          if (hasScanned) ...[
-                            _buildSectionHeader(
-                              "Wykryte urządzenia",
-                              Icons.search,
-                              Colors.grey,
-                            ),
-                            ...filteredResults.map(
-                              (result) => _buildDeviceTile(result),
-                            ),
-                          ],
-                        ],
-                      );
-                    },
-                  ),
+                : _buildScanResults(),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildScanResults() {
+    final knownIds = {
+      ..._connectedDevices.map((d) => d.id),
+      ..._bondedDevices.map((d) => d.id),
+    };
+    final filteredResults = _scannedResultsById.values
+        .where((r) => !knownIds.contains(r.device.id))
+        .toList();
+
+    final hasConnected = _connectedDevices.isNotEmpty;
+    final hasBonded = _bondedDevices.isNotEmpty;
+    final hasScanned = filteredResults.isNotEmpty;
+
+    if (!hasConnected && !hasBonded && !hasScanned) {
+      return const Center(
+        child: Text("Nie znaleziono urządzeń"),
+      );
+    }
+
+    return ListView(
+      children: [
+        if (hasConnected) ...[
+          _buildSectionHeader(
+            "Połączone urządzenia",
+            Icons.bluetooth_connected,
+            Colors.green,
+          ),
+          ..._connectedDevices.map(
+            (device) => _buildKnownDeviceTile(
+              device,
+              isConnected: true,
+            ),
+          ),
+          const Divider(thickness: 2),
+        ],
+        if (hasBonded) ...[
+          _buildSectionHeader(
+            "Sparowane urządzenia",
+            Icons.bluetooth,
+            Colors.blue,
+          ),
+          ..._bondedDevices.map(
+            (device) => _buildKnownDeviceTile(
+              device,
+              isConnected: false,
+            ),
+          ),
+          const Divider(thickness: 2),
+        ],
+        if (hasScanned) ...[
+          _buildSectionHeader(
+            "Wykryte urządzenia",
+            Icons.search,
+            Colors.grey,
+          ),
+          ...filteredResults.map(
+            (result) => _buildDeviceTile(result),
+          ),
+        ],
+      ],
     );
   }
 
@@ -313,12 +347,9 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
   }
 
   Widget _buildDeviceTile(BleScanResult res) {
-    final advName = res.advName;
-    final name = res.device.name.isNotEmpty
-        ? res.device.name
-        : advName.isNotEmpty
-        ? advName
-        : res.device.id;
+    final advName = res.advName.trim();
+    final hasDeviceName = res.device.name.trim() != res.device.id.trim();
+    final name = hasDeviceName ? res.device.name : advName;
 
     return ListTile(
       title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
