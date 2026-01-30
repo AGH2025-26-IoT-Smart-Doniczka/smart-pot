@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_pot_mobile_app/data/pots_controller.dart';
@@ -17,17 +19,47 @@ class PotDetailScreen extends StatefulWidget {
 class _PotDetailScreenState extends State<PotDetailScreen> {
   bool _isWatering = false;
   late final TextEditingController _durationController;
+  late final ScrollController _scrollController;
+  Timer? _refreshTimer;
+  int? _refreshIntervalSec;
 
   @override
   void initState() {
     super.initState();
     _durationController = TextEditingController(text: '5');
+    _scrollController = ScrollController();
   }
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _durationController.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _ensureAutoRefresh(int seconds) {
+    if (seconds <= 0) {
+      _refreshTimer?.cancel();
+      _refreshTimer = null;
+      _refreshIntervalSec = null;
+      return;
+    }
+    if (_refreshIntervalSec == seconds && _refreshTimer != null) {
+      return;
+    }
+    _refreshTimer?.cancel();
+    _refreshIntervalSec = seconds;
+    _refreshTimer = Timer.periodic(
+      Duration(seconds: seconds),
+      (_) => _refreshPot(),
+    );
+  }
+
+  Future<void> _refreshPot() async {
+    final controller = context.read<PotsController>();
+    if (controller.isLoading) return;
+    await controller.fetchPots();
   }
 
   Future<void> _handleWatering() async {
@@ -87,11 +119,16 @@ class _PotDetailScreenState extends State<PotDetailScreen> {
     final sendInterval = viewPot.config.sendIntervalSec;
     final wateringInterval = viewPot.config.wateringIntervalSec;
     final wateringDuration = viewPot.config.wateringDurationSec;
+    _ensureAutoRefresh(sendInterval);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(viewPot.name),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _refreshPot,
+          ),
           IconButton(
             icon: const Icon(Icons.show_chart),
             onPressed: () async {
@@ -116,6 +153,8 @@ class _PotDetailScreenState extends State<PotDetailScreen> {
         ],
       ),
       body: SingleChildScrollView(
+        key: PageStorageKey('pot_detail_${widget.pot.potId}'),
+        controller: _scrollController,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

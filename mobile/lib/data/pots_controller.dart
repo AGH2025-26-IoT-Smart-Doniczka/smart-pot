@@ -473,6 +473,103 @@ class PotsController extends ChangeNotifier {
         .toList();
   }
 
+  Future<List<PotHistoryPoint>> fetchPotHistoryRecent({
+    required String potId,
+    required int count,
+  }) async {
+    final user = _authController.currentUser;
+    if (user == null) {
+      throw Exception("Użytkownik nie jest zalogowany");
+    }
+
+    final query = Uri(
+      queryParameters: {
+        'count': count.toString(),
+      },
+    );
+    final url = Uri.parse('$_baseUrl/pots/$potId/measures')
+        .replace(query: query.query);
+
+    final response = await http.get(
+      url,
+      headers: {'Authorization': 'Bearer ${user.token}'},
+    );
+
+    if (response.statusCode != 200) {
+      String details = '';
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          details = decoded['detail']?.toString() ?? '';
+        } else if (decoded is String) {
+          details = decoded;
+        }
+      } catch (_) {
+        details = response.body;
+      }
+      throw Exception(
+        details.isNotEmpty
+            ? "Błąd pobierania historii: ${response.statusCode} ($details)"
+            : "Błąd pobierania historii: ${response.statusCode}",
+      );
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic>) {
+      throw Exception("Nieprawidłowa odpowiedź serwera");
+    }
+
+    final measures = (decoded['measures'] as List<dynamic>?) ?? const [];
+    final points = measures
+        .whereType<Map<String, dynamic>>()
+        .map((item) {
+          final data = (item['data'] as Map<String, dynamic>?) ?? const {};
+          double _asDouble(dynamic value) =>
+              value == null ? 0 : (value as num).toDouble();
+
+          final airTemp = _asDouble(data['tem']);
+          final airPressure = _asDouble(data['pre']);
+          final soilMoisture = _asDouble(data['moi']);
+          final illuminance = _asDouble(data['lux']);
+
+          return PotHistoryPoint(
+            timestamp: DateTime.parse(item['timestamp'] as String),
+            airTemp: MetricAggregate(
+              avg: airTemp,
+              min: airTemp,
+              max: airTemp,
+            ),
+            airPressure: MetricAggregate(
+              avg: airPressure,
+              min: airPressure,
+              max: airPressure,
+            ),
+            soilMoisture: MetricAggregate(
+              avg: soilMoisture,
+              min: soilMoisture,
+              max: soilMoisture,
+            ),
+            illuminance: MetricAggregate(
+              avg: illuminance,
+              min: illuminance,
+              max: illuminance,
+            ),
+          );
+        })
+        .toList();
+
+    points.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    return points;
+  }
+
+  Future<DateTime?> fetchLatestMeasureTimestamp({
+    required String potId,
+  }) async {
+    final points = await fetchPotHistoryRecent(potId: potId, count: 1);
+    if (points.isEmpty) return null;
+    return points.last.timestamp;
+  }
+
   Future<void> addPotConnection(
     String potId, {
     required String email,

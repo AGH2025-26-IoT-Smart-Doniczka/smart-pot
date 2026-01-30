@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -10,11 +12,15 @@ class HistoryRangeOption {
   final String label;
   final int days;
   final String bucket;
+  final bool isRecent;
+  final int? count;
 
   const HistoryRangeOption({
     required this.label,
     required this.days,
     required this.bucket,
+    this.isRecent = false,
+    this.count,
   });
 }
 
@@ -29,6 +35,13 @@ class PotHistoryScreen extends StatefulWidget {
 
 class _PotHistoryScreenState extends State<PotHistoryScreen> {
   static const _ranges = [
+    HistoryRangeOption(
+      label: 'Ostatnie pomiary',
+      days: 0,
+      bucket: '1h',
+      isRecent: true,
+      count: 20,
+    ),
     HistoryRangeOption(label: '7 dni', days: 7, bucket: '1h'),
     HistoryRangeOption(label: '30 dni', days: 30, bucket: '6h'),
     HistoryRangeOption(label: '3 miesiące', days: 90, bucket: '1d'),
@@ -36,29 +49,88 @@ class _PotHistoryScreenState extends State<PotHistoryScreen> {
 
   HistoryRangeOption _range = _ranges[0];
   bool _loading = false;
+  bool _refreshing = false;
   String? _error;
   List<PotHistoryPoint> _points = const [];
+  Timer? _refreshTimer;
+  int? _refreshIntervalSec;
+  late final ScrollController _scrollController;
 
   @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController();
     _loadHistory();
   }
 
-  Future<void> _loadHistory() async {
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _ensureAutoRefresh(int seconds) {
+    if (!_range.isRecent || seconds <= 0) {
+      _refreshTimer?.cancel();
+      _refreshTimer = null;
+      _refreshIntervalSec = null;
+      return;
+    }
+    if (_refreshIntervalSec == seconds && _refreshTimer != null) {
+      return;
+    }
+    _refreshTimer?.cancel();
+    _refreshIntervalSec = seconds;
+    _refreshTimer = Timer.periodic(
+      Duration(seconds: seconds),
+      (_) => _loadHistory(background: true),
+    );
+  }
+
+  Future<void> _loadHistory({bool background = false}) async {
+    if (_loading || _refreshing) return;
     setState(() {
-      _loading = true;
+      if (background && _points.isNotEmpty) {
+        _refreshing = true;
+      } else {
+        _loading = true;
+      }
       _error = null;
     });
     try {
-      final now = DateTime.now().toUtc();
-      final from = now.subtract(Duration(days: _range.days));
-      final points = await context.read<PotsController>().fetchPotHistory(
-        potId: widget.pot.potId,
-        from: from,
-        to: now,
-        bucket: _range.bucket,
-      );
+      final controller = context.read<PotsController>();
+      List<PotHistoryPoint> points;
+      if (_range.isRecent) {
+        points = await controller.fetchPotHistoryRecent(
+          potId: widget.pot.potId,
+          count: _range.count ?? 20,
+        );
+      } else {
+        final now = DateTime.now().toUtc();
+        final from = now.subtract(Duration(days: _range.days));
+        points = await controller.fetchPotHistory(
+          potId: widget.pot.potId,
+          from: from,
+          to: now,
+          bucket: _range.bucket,
+        );
+        if (points.isEmpty) {
+          final latestTs = await controller.fetchLatestMeasureTimestamp(
+            potId: widget.pot.potId,
+          );
+          if (latestTs != null) {
+            final to = latestTs.toUtc();
+            final fromLatest = to.subtract(Duration(days: _range.days));
+            points = await controller.fetchPotHistory(
+              potId: widget.pot.potId,
+              from: fromLatest,
+              to: to,
+              bucket: _range.bucket,
+            );
+          }
+        }
+      }
       if (!mounted) return;
       setState(() {
         _points = points;
@@ -72,6 +144,7 @@ class _PotHistoryScreenState extends State<PotHistoryScreen> {
       if (mounted) {
         setState(() {
           _loading = false;
+          _refreshing = false;
         });
       }
     }
@@ -79,10 +152,28 @@ class _PotHistoryScreenState extends State<PotHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentPot = context.select<PotsController, Pot?>(
+      (ctrl) => ctrl.pots.firstWhere(
+        (p) => p.potId == widget.pot.potId,
+        orElse: () => widget.pot,
+      ),
+    );
+    final viewPot = currentPot ?? widget.pot;
+    _ensureAutoRefresh(viewPot.config.sendIntervalSec);
+
     return Scaffold(
-      appBar: AppBar(title: Text('Historia: ${widget.pot.name}')),
+      appBar: AppBar(
+        title: Text('Historia: ${widget.pot.name}'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadHistory,
+          ),
+        ],
+      ),
       body: Column(
         children: [
+          if (_refreshing) const LinearProgressIndicator(minHeight: 2),
           Padding(
             padding: const EdgeInsets.all(12),
             child: Wrap(
@@ -105,13 +196,15 @@ class _PotHistoryScreenState extends State<PotHistoryScreen> {
             ),
           ),
           Expanded(
-            child: _loading
+            child: _loading && _points.isEmpty
                 ? const Center(child: CircularProgressIndicator())
-                : _error != null
+                : _error != null && _points.isEmpty
                 ? _buildError(context, _error!)
                 : _points.isEmpty
                 ? const Center(child: Text('Brak danych historycznych'))
                 : ListView(
+                    key: PageStorageKey('pot_history_${widget.pot.potId}'),
+                    controller: _scrollController,
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     children: [
                       _buildChartCard(
@@ -119,24 +212,28 @@ class _PotHistoryScreenState extends State<PotHistoryScreen> {
                         title: 'Temperatura (°C)',
                         color: Colors.red,
                         metricSelector: (p) => p.airTemp,
+                        showMinMax: !_range.isRecent,
                       ),
                       _buildChartCard(
                         context,
                         title: 'Ciśnienie (hPa)',
                         color: Colors.blueGrey,
                         metricSelector: (p) => p.airPressure,
+                        showMinMax: !_range.isRecent,
                       ),
                       _buildChartCard(
                         context,
                         title: 'Wilgotność gleby (%)',
                         color: Colors.blue,
                         metricSelector: (p) => p.soilMoisture,
+                        showMinMax: !_range.isRecent,
                       ),
                       _buildChartCard(
                         context,
                         title: 'Oświetlenie (lx)',
                         color: Colors.amber,
                         metricSelector: (p) => p.illuminance,
+                        showMinMax: !_range.isRecent,
                       ),
                       const SizedBox(height: 16),
                     ],
@@ -182,10 +279,13 @@ class _PotHistoryScreenState extends State<PotHistoryScreen> {
     required String title,
     required Color color,
     required MetricAggregate Function(PotHistoryPoint) metricSelector,
+    required bool showMinMax,
   }) {
     final avgSpots = _buildSpots(metricSelector, (m) => m.avg);
-    final minSpots = _buildSpots(metricSelector, (m) => m.min);
-    final maxSpots = _buildSpots(metricSelector, (m) => m.max);
+    final minSpots =
+        showMinMax ? _buildSpots(metricSelector, (m) => m.min) : const <FlSpot>[];
+    final maxSpots =
+        showMinMax ? _buildSpots(metricSelector, (m) => m.max) : const <FlSpot>[];
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -213,38 +313,49 @@ class _PotHistoryScreenState extends State<PotHistoryScreen> {
                       barWidth: 2.5,
                       dotData: const FlDotData(show: false),
                     ),
-                    LineChartBarData(
-                      spots: minSpots,
-                      color: color.withValues(alpha: 0.6),
-                      isCurved: false,
-                      barWidth: 1.5,
-                      dotData: const FlDotData(show: false),
-                      dashArray: const [6, 4],
-                    ),
-                    LineChartBarData(
-                      spots: maxSpots,
-                      color: color.withValues(alpha: 0.6),
-                      isCurved: false,
-                      barWidth: 1.5,
-                      dotData: const FlDotData(show: false),
-                      dashArray: const [6, 4],
-                    ),
+                    if (showMinMax)
+                      LineChartBarData(
+                        spots: minSpots,
+                        color: color.withValues(alpha: 0.6),
+                        isCurved: false,
+                        barWidth: 1.5,
+                        dotData: const FlDotData(show: false),
+                        dashArray: const [6, 4],
+                      ),
+                    if (showMinMax)
+                      LineChartBarData(
+                        spots: maxSpots,
+                        color: color.withValues(alpha: 0.6),
+                        isCurved: false,
+                        barWidth: 1.5,
+                        dotData: const FlDotData(show: false),
+                        dashArray: const [6, 4],
+                      ),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                _legendDot(color),
-                const SizedBox(width: 6),
-                const Text('avg'),
-                const SizedBox(width: 16),
-                _legendDash(color.withValues(alpha: 0.6)),
-                const SizedBox(width: 6),
-                const Text('min/max'),
-              ],
-            ),
+            if (showMinMax)
+              Row(
+                children: [
+                  _legendDot(color),
+                  const SizedBox(width: 6),
+                  const Text('avg'),
+                  const SizedBox(width: 16),
+                  _legendDash(color.withValues(alpha: 0.6)),
+                  const SizedBox(width: 6),
+                  const Text('min/max'),
+                ],
+              )
+            else
+              Row(
+                children: [
+                  _legendDot(color),
+                  const SizedBox(width: 6),
+                  const Text('wartość'),
+                ],
+              ),
           ],
         ),
       ),
@@ -287,7 +398,7 @@ class _PotHistoryScreenState extends State<PotHistoryScreen> {
   }
 
   FlTitlesData _buildTitles(BuildContext context) {
-    final formatter = _range.days <= 7
+    final formatter = (_range.isRecent || _range.days <= 7)
         ? DateFormat('dd.MM HH:mm')
         : DateFormat('dd.MM');
 
