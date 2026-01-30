@@ -263,6 +263,13 @@ esp_err_t wifi_manager_start(void)
     ESP_RETURN_ON_ERROR(esp_wifi_set_mode(WIFI_MODE_STA), TAG, "set mode");
     ESP_RETURN_ON_ERROR(esp_wifi_set_config(WIFI_IF_STA, &wifi_cfg), TAG, "set config");
 
+    if (s_started && app_context_is_wifi_connected()) {
+        wifi_update_time_sync_flag_once();
+        wifi_start_time_sync();
+        ESP_LOGI(TAG, "wifi already connected");
+        return ESP_OK;
+    }
+
     if (s_started) {
         (void)esp_wifi_disconnect();
         (void)esp_wifi_connect();

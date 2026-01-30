@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "esp_log.h"
+#include "esp_attr.h"
 #include "freertos/FreeRTOS.h"
 #include "ssd1306.h"
 #include "ssd1306_images.h"
@@ -11,6 +12,7 @@
 #include "sensor_task_context.h"
 #include "fsm_manager.h"
 #include "fsm_state_callbacks.h"
+#include "mqtt_manager.h"
 
 /* =========================================================================
    SECTION: Helpers
@@ -120,6 +122,7 @@ static void display_sensor_data(const sensor_data_t *data)
 }
 
 static const char *TAG = "STATE_SENSING";
+RTC_DATA_ATTR static uint8_t s_weak_count = 0;
 
 /* =========================================================================
    SECTION: Callbacks
@@ -169,6 +172,44 @@ void state_sensing_on_enter(void)
     ESP_LOGI(TAG, "soil status=%s moisture=%u%%",
              soil_status_str(soil_status),
              (unsigned)data.soil_moisture);
+
+    bool weak_moi = false;
+    bool weak_tem = false;
+    if (has_cfg) {
+        if (!threshold_u8_invalid(cfg.plant_config.moi[0], cfg.plant_config.moi[1])) {
+            weak_moi = (data.soil_moisture < cfg.plant_config.moi[0]);
+        }
+        if (!threshold_u16_invalid(cfg.plant_config.tem[0], cfg.plant_config.tem[1])) {
+            weak_tem = (data.temperature < cfg.plant_config.tem[0]);
+        }
+    }
+
+    if (weak_moi || weak_tem) {
+        s_weak_count++;
+        if (s_weak_count >= 3U) {
+            char msg[160] = {0};
+            float temp_c = ((float)data.temperature / 10.0f) - 273.15f;
+            if (weak_moi && weak_tem) {
+                (void)snprintf(msg, sizeof(msg),
+                               "Slabe warunki: niska wilgotnosc (%u%%) i niska temperatura (%.1fC).",
+                               (unsigned)data.soil_moisture,
+                               (double)temp_c);
+            } else if (weak_moi) {
+                (void)snprintf(msg, sizeof(msg),
+                               "Slabe warunki: niska wilgotnosc (%u%%).",
+                               (unsigned)data.soil_moisture);
+            } else {
+                (void)snprintf(msg, sizeof(msg),
+                               "Slabe warunki: niska temperatura (%.1fC).",
+                               (double)temp_c);
+            }
+            (void)mqtt_manager_publish_log("alert", 3, msg);
+            s_weak_count = 0;
+        }
+    } else {
+        s_weak_count = 0;
+    }
+
     if (app_context_display_on_wakeup()) {
         display_sensor_data(&data);
     }

@@ -22,6 +22,7 @@
 #include "app_events.h"
 #include "fsm_manager.h"
 #include "nvs_manager.h"
+#include "mqtt_manager.h"
 #include "json_config_parser.h"
 #include "ble_provisioning.h"
 
@@ -438,6 +439,7 @@ static void apply_if_complete(void)
 		ESP_LOGW(TAG, "save cfg failed (%s)", esp_err_to_name(err));
 		return;
 	}
+	(void)mqtt_manager_publish_config_log(&cfg);
 
 	s_complete_sent = true;
 	stop_timeout_timer();

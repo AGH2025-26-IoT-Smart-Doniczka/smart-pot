@@ -35,3 +35,6 @@ esp_err_t nvs_manager_clear_samples(void);
 
 esp_err_t nvs_manager_get_first_connect(bool *out_done);
 esp_err_t nvs_manager_set_first_connect_done(void);
+
+esp_err_t nvs_manager_get_welcome_alert_sent(bool *out_done);
+esp_err_t nvs_manager_set_welcome_alert_sent(void);

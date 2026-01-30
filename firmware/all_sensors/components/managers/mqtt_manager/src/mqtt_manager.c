@@ -4,6 +4,8 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_mac.h"
+#include "esp_event.h"
+#include "esp_netif.h"
 #include "mqtt_client.h"
 #include "cJSON.h"
 #include "app_context.h"
@@ -23,6 +25,8 @@
 
 #define MQTT_TOPIC_BUF_LEN        96
 #define MQTT_PAYLOAD_BUF_LEN      256
+#define MQTT_LOG_LABEL_LEN        16
+#define MQTT_LOG_DATA_LEN         256
 #define MQTT_FAIL_WINDOW_US       (30LL * 1000LL * 1000LL)
 #define MQTT_FAIL_THRESHOLD       3
 #define MQTT_TIME_VALID_EPOCH_S   1700000000UL
@@ -42,6 +46,10 @@ static char s_mqtt_pass[33] = {0};
 static int s_mqtt_fail_count = 0;
 static int64_t s_mqtt_fail_window_start_us = 0;
 static uint32_t s_mqtt_msg_counter = 0;
+static bool s_log_pending = false;
+static int s_log_pending_level = 0;
+static char s_log_pending_label[MQTT_LOG_LABEL_LEN] = {0};
+static char s_log_pending_data[MQTT_LOG_DATA_LEN] = {0};
 
 /* =========================================================================
    SECTION: Helpers
@@ -63,7 +71,8 @@ static void mqtt_build_uuid(void)
 static void mqtt_build_topics(char *telemetry, size_t telemetry_len,
                               char *cfg_topic, size_t cfg_topic_len,
                               char *actions, size_t actions_len,
-                              char *hard_reset, size_t hard_reset_len)
+                              char *hard_reset, size_t hard_reset_len,
+                              char *logs, size_t logs_len)
 {
     mqtt_build_uuid();
     if (telemetry != NULL && telemetry_len > 0U) {
@@ -77,6 +86,9 @@ static void mqtt_build_topics(char *telemetry, size_t telemetry_len,
     }
     if (hard_reset != NULL && hard_reset_len > 0U) {
         (void)snprintf(hard_reset, hard_reset_len, "devices/%s/hard-reset", s_uuid);
+    }
+    if (logs != NULL && logs_len > 0U) {
+        (void)snprintf(logs, logs_len, "devices/%s/logs", s_uuid);
     }
 
 }
@@ -116,6 +128,115 @@ static uint32_t mqtt_get_unix_ts(void)
         ESP_LOGW(TAG, "time synced flag set but time invalid (%ld)", (long)now);
     }
     return 0U;
+}
+
+static void mqtt_store_pending_log(const char *label, int level, const char *data)
+{
+    if (label == NULL || data == NULL) {
+        return;
+    }
+
+    if (s_log_pending) {
+        if (strcmp(s_log_pending_label, "config") == 0 && strcmp(label, "config") != 0) {
+            ESP_LOGW(TAG, "pending config preserved, drop label=%s", label);
+            return;
+        }
+        if (strcmp(label, "config") == 0 && strcmp(s_log_pending_label, "config") != 0) {
+            ESP_LOGW(TAG, "pending log replaced by config label=%s", s_log_pending_label);
+        } else {
+            ESP_LOGW(TAG, "pending log overwritten label=%s", label);
+        }
+    }
+
+    s_log_pending = true;
+    s_log_pending_level = level;
+    (void)snprintf(s_log_pending_label, sizeof(s_log_pending_label), "%s", label);
+    (void)snprintf(s_log_pending_data, sizeof(s_log_pending_data), "%s", data);
+}
+
+static esp_err_t mqtt_publish_log_internal(const char *label, int level, const char *data)
+{
+    if (label == NULL || data == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    char logs_topic[MQTT_TOPIC_BUF_LEN] = {0};
+    mqtt_build_topics(NULL, 0U, NULL, 0U, NULL, 0U, NULL, 0U, logs_topic, sizeof(logs_topic));
+
+    cJSON *root = cJSON_CreateObject();
+    if (root == NULL) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    uint32_t unix_ts = mqtt_get_unix_ts();
+    cJSON_AddNumberToObject(root, "ts", mqtt_next_timestamp_s(unix_ts));
+    cJSON_AddStringToObject(root, "lab", label);
+    cJSON_AddNumberToObject(root, "lvl", level);
+    cJSON_AddStringToObject(root, "data", data);
+
+    char *json = cJSON_PrintUnformatted(root);
+    if (json == NULL) {
+        cJSON_Delete(root);
+        return ESP_ERR_NO_MEM;
+    }
+
+    esp_err_t err = mqtt_publish_json(logs_topic, json, 1);
+    cJSON_free(json);
+    cJSON_Delete(root);
+    return err;
+}
+
+static void mqtt_publish_pending_log(void)
+{
+    if (!s_log_pending) {
+        return;
+    }
+
+    if (mqtt_publish_log_internal(s_log_pending_label, s_log_pending_level, s_log_pending_data) == ESP_OK) {
+        s_log_pending = false;
+        s_log_pending_level = 0;
+        s_log_pending_label[0] = '\0';
+        s_log_pending_data[0] = '\0';
+    }
+}
+
+static char *mqtt_build_config_json(const config_t *cfg)
+{
+    if (cfg == NULL) {
+        return NULL;
+    }
+
+    cJSON *root = cJSON_CreateObject();
+    if (root == NULL) {
+        return NULL;
+    }
+
+    cJSON *moi = cJSON_CreateArray();
+    if (moi != NULL) {
+        cJSON_AddItemToArray(moi, cJSON_CreateNumber((int)cfg->plant_config.moi[0]));
+        cJSON_AddItemToArray(moi, cJSON_CreateNumber((int)cfg->plant_config.moi[1]));
+        cJSON_AddItemToObject(root, "moi", moi);
+    }
+
+    cJSON *tem = cJSON_CreateArray();
+    if (tem != NULL) {
+        float min_c = ((float)cfg->plant_config.tem[0] / 10.0f) - 273.15f;
+        float max_c = ((float)cfg->plant_config.tem[1] / 10.0f) - 273.15f;
+        double min_c_1dp = (double)((int)(min_c * 10.0f + (min_c >= 0.0f ? 0.5f : -0.5f))) / 10.0;
+        double max_c_1dp = (double)((int)(max_c * 10.0f + (max_c >= 0.0f ? 0.5f : -0.5f))) / 10.0;
+        cJSON_AddItemToArray(tem, cJSON_CreateNumber(min_c_1dp));
+        cJSON_AddItemToArray(tem, cJSON_CreateNumber(max_c_1dp));
+        cJSON_AddItemToObject(root, "tem", tem);
+    }
+
+    cJSON_AddNumberToObject(root, "mes", (int)cfg->mes);
+    cJSON_AddNumberToObject(root, "sen", (int)cfg->sen);
+    cJSON_AddNumberToObject(root, "wat", (int)cfg->wat);
+    cJSON_AddNumberToObject(root, "wai", (int)cfg->wai);
+
+    char *json = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    return json;
 }
 
 
@@ -194,12 +315,14 @@ static void mqtt_handle_cfg(const char *json_str)
         } else {
             ESP_LOGW(TAG, "config save failed (%s)", esp_err_to_name(save_err));
         }
+        (void)mqtt_manager_publish_config_log(&cfg);
     }
 }
 
 static void mqtt_handle_hard_reset(void)
 {
     ESP_LOGE(TAG, "HARD_RESET");
+    (void)mqtt_manager_publish_log("factory_reset", 2, "Factory reset command received");
     (void)fsm_manager_post_event(APP_EVENT_BTN1_10S, NULL, 0, 0);
 
 }
@@ -213,7 +336,7 @@ static void mqtt_publish_telemetry_internal(void)
     char topic[MQTT_TOPIC_BUF_LEN] = {0};
     char actions_topic[MQTT_TOPIC_BUF_LEN] = {0};
     char hard_reset[MQTT_TOPIC_BUF_LEN] = {0};
-    mqtt_build_topics(topic, sizeof(topic), NULL, 0U, actions_topic, sizeof(actions_topic), hard_reset, sizeof(hard_reset));
+    mqtt_build_topics(topic, sizeof(topic), NULL, 0U, actions_topic, sizeof(actions_topic), hard_reset, sizeof(hard_reset), NULL, 0U);
 
     float temp_c = ((float)data.temperature / 10.0f) - 273.15f;
     double temp_c_1dp = (double)((int)(temp_c * 10.0f + (temp_c >= 0.0f ? 0.5f : -0.5f))) / 10.0;
@@ -296,7 +419,7 @@ static void mqtt_publish_stored_samples(void)
     char topic[MQTT_TOPIC_BUF_LEN] = {0};
     char actions_topic[MQTT_TOPIC_BUF_LEN] = {0};
     char hard_reset[MQTT_TOPIC_BUF_LEN] = {0};
-    mqtt_build_topics(topic, sizeof(topic), NULL, 0U, actions_topic, sizeof(actions_topic), hard_reset, sizeof(hard_reset));
+    mqtt_build_topics(topic, sizeof(topic), NULL, 0U, actions_topic, sizeof(actions_topic), hard_reset, sizeof(hard_reset), NULL, 0U);
 
     bool all_ok = true;
     for (size_t i = 0; i < count; ++i) {
@@ -321,7 +444,7 @@ static void mqtt_handle_event_data(const esp_mqtt_event_handle_t event)
     char cfg_topic[MQTT_TOPIC_BUF_LEN] = {0};
     char actions_topic[MQTT_TOPIC_BUF_LEN] = {0};
     char hard_reset_topic[MQTT_TOPIC_BUF_LEN] = {0};
-    mqtt_build_topics(NULL, 0U, cfg_topic, sizeof(cfg_topic), actions_topic, sizeof(actions_topic), hard_reset_topic, sizeof(hard_reset_topic));
+    mqtt_build_topics(NULL, 0U, cfg_topic, sizeof(cfg_topic), actions_topic, sizeof(actions_topic), hard_reset_topic, sizeof(hard_reset_topic), NULL, 0U);
 
     if ((event->topic_len <= 0) || (event->data_len <= 0)) {
         return;
@@ -409,12 +532,21 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                 char cfg_topic[MQTT_TOPIC_BUF_LEN] = {0};
                 char actions_topic[MQTT_TOPIC_BUF_LEN] = {0};
                 char hard_reset_topic[MQTT_TOPIC_BUF_LEN] = {0};
-                mqtt_build_topics(NULL, 0U, cfg_topic, sizeof(cfg_topic), actions_topic, sizeof(actions_topic), hard_reset_topic, sizeof(hard_reset_topic));
+                mqtt_build_topics(NULL, 0U, cfg_topic, sizeof(cfg_topic), actions_topic, sizeof(actions_topic), hard_reset_topic, sizeof(hard_reset_topic), NULL, 0U);
 
                 (void)esp_mqtt_client_subscribe(s_client, cfg_topic, 1);
                 (void)esp_mqtt_client_subscribe(s_client, actions_topic, 1);
                 (void)esp_mqtt_client_subscribe(s_client, hard_reset_topic, 1);
                 s_subscribed = true;
+            }
+
+            mqtt_publish_pending_log();
+
+            bool welcome_sent = false;
+            if (nvs_manager_get_welcome_alert_sent(&welcome_sent) == ESP_OK && !welcome_sent) {
+                if (mqtt_publish_log_internal("alert", 1, "Polaczyles sie z nowa doniczka") == ESP_OK) {
+                    (void)nvs_manager_set_welcome_alert_sent();
+                }
             }
 
             if (s_publish_pending) {
@@ -459,10 +591,34 @@ static void mqtt_prepare_password(void)
     s_mqtt_pass[sizeof(s_mqtt_pass) - 1] = '\0';
 }
 
+static esp_err_t mqtt_ensure_netif_ready(void)
+{
+    esp_err_t err = esp_netif_init();
+    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+        return err;
+    }
+
+    err = esp_event_loop_create_default();
+    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+        return err;
+    }
+
+    return ESP_OK;
+}
+
 static esp_err_t mqtt_client_start_internal(void)
 {
     if (s_client != NULL) {
         return ESP_OK;
+    }
+
+    if (!app_context_is_wifi_connected()) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    esp_err_t err = mqtt_ensure_netif_ready();
+    if (err != ESP_OK) {
+        return err;
     }
 
     mqtt_prepare_password();
@@ -518,11 +674,18 @@ static esp_err_t mqtt_client_start_internal(void)
    ========================================================================= */
 esp_err_t mqtt_manager_start(void)
 {
+    if (!app_context_is_wifi_connected()) {
+        return ESP_ERR_INVALID_STATE;
+    }
     return mqtt_client_start_internal();
 }
 
 esp_err_t mqtt_manager_publish_telemetry(void)
 {
+    if (!app_context_is_wifi_connected()) {
+        s_publish_pending = true;
+        return ESP_OK;
+    }
     esp_err_t err = mqtt_client_start_internal();
     if (err != ESP_OK) {
         return err;
@@ -534,6 +697,49 @@ esp_err_t mqtt_manager_publish_telemetry(void)
         s_publish_pending = true;
     }
     return ESP_OK;
+}
+
+esp_err_t mqtt_manager_publish_log(const char *label, int level, const char *data)
+{
+    if (label == NULL || data == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (level < 1 || level > 4) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (!app_context_is_wifi_connected()) {
+        mqtt_store_pending_log(label, level, data);
+        return ESP_OK;
+    }
+
+    esp_err_t err = mqtt_client_start_internal();
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    if (s_connected) {
+        return mqtt_publish_log_internal(label, level, data);
+    }
+
+    mqtt_store_pending_log(label, level, data);
+    return ESP_OK;
+}
+
+esp_err_t mqtt_manager_publish_config_log(const config_t *cfg)
+{
+    if (cfg == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    char *json = mqtt_build_config_json(cfg);
+    if (json == NULL) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    esp_err_t err = mqtt_manager_publish_log("config", 1, json);
+    cJSON_free(json);
+    return err;
 }
 
 esp_err_t mqtt_manager_stop(void)
@@ -551,5 +757,9 @@ esp_err_t mqtt_manager_stop(void)
     s_last_pub_id = -1;
     s_mqtt_fail_count = 0;
     s_mqtt_fail_window_start_us = 0;
+    s_log_pending = false;
+    s_log_pending_level = 0;
+    s_log_pending_label[0] = '\0';
+    s_log_pending_data[0] = '\0';
     return ESP_OK;
 }

@@ -18,6 +18,7 @@ static const char *TAG = "NVS_MGR";
 #define NVS_KEY_META_NEXT    "meta_next"
 #define NVS_KEY_META_COUNT   "meta_cnt"
 #define NVS_KEY_FIRST_CONNECT "fc_done"
+#define NVS_KEY_WELCOME_DONE "welcome_done"
 
 /* =========================================================================
    SECTION: Static State
@@ -360,6 +361,39 @@ esp_err_t nvs_manager_set_first_connect_done(void)
     ESP_RETURN_ON_ERROR(ensure_nvs(), TAG, "nvs not ready");
 
     esp_err_t err = nvs_set_u8(s_nvs, NVS_KEY_FIRST_CONNECT, 1U);
+    if (err != ESP_OK) {
+        return err;
+    }
+    return nvs_commit(s_nvs);
+}
+
+esp_err_t nvs_manager_get_welcome_alert_sent(bool *out_done)
+{
+    if (out_done == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    ESP_RETURN_ON_ERROR(ensure_nvs(), TAG, "nvs not ready");
+
+    uint8_t flag = 0;
+    esp_err_t err = nvs_get_u8(s_nvs, NVS_KEY_WELCOME_DONE, &flag);
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        *out_done = false;
+        return ESP_OK;
+    }
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    *out_done = (flag != 0U);
+    return ESP_OK;
+}
+
+esp_err_t nvs_manager_set_welcome_alert_sent(void)
+{
+    ESP_RETURN_ON_ERROR(ensure_nvs(), TAG, "nvs not ready");
+
+    esp_err_t err = nvs_set_u8(s_nvs, NVS_KEY_WELCOME_DONE, 1U);
     if (err != ESP_OK) {
         return err;
     }
