@@ -91,6 +91,17 @@ static const char *fsm_event_str(app_event_id_t event_id)
     }
 }
 
+static const char *soil_status_str(soil_status_t status)
+{
+    switch (status) {
+        case SOIL_STATUS_TOO_DRY: return "TOO_DRY";
+        case SOIL_STATUS_OK: return "OK";
+        case SOIL_STATUS_TOO_WET: return "TOO_WET";
+        case SOIL_STATUS_UNKNOWN: return "UNKNOWN";
+        default: return "UNKNOWN";
+    }
+}
+
 static void fsm_invoke_entry_action(app_state_t state)
 {
     switch (state) {
@@ -517,6 +528,11 @@ static void fsm_event_handler(void *handler_args, esp_event_base_t base, int32_t
     if (id == APP_EVENT_WATERING_REQUEST) {
         const watering_request_t *req = (const watering_request_t *)event_data;
         uint16_t duration = (req != NULL) ? req->duration_s : 0U;
+        soil_status_t soil_status = app_context_get_soil_status();
+        if (soil_status == SOIL_STATUS_TOO_WET || soil_status == SOIL_STATUS_UNKNOWN) {
+            ESP_LOGW(TAG, "watering request blocked (soil=%s)", soil_status_str(soil_status));
+            return;
+        }
         esp_err_t err = watering_manager_start_async(duration);
         if (err != ESP_OK) {
             ESP_LOGW(TAG, "watering request failed (%s)", esp_err_to_name(err));

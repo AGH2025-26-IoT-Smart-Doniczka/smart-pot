@@ -24,6 +24,7 @@ typedef struct {
    bool display_on_wakeup;      // show display after button wakeup
    uint32_t data_block_seq;     // rolling sensor block number
    sensor_data_t sensor_data;   // latest sensor readout
+   soil_status_t soil_status;   // latest soil status
    i2c_master_bus_handle_t bus_display;  // disposable bus handle for display
    i2c_master_bus_handle_t bus_sensors;  // disposable bus handle for sensors
    ssd1306_handle_t display;             // shared display handle
@@ -58,6 +59,9 @@ uint32_t app_context_peek_data_block_seq(void);
 
 esp_err_t app_context_set_sensor_data(const sensor_data_t *data);
 esp_err_t app_context_get_sensor_data(sensor_data_t *out);
+
+void app_context_set_soil_status(soil_status_t status);
+soil_status_t app_context_get_soil_status(void);
 
 esp_err_t app_context_set_display_bus(i2c_master_bus_handle_t bus);
 esp_err_t app_context_set_sensors_bus(i2c_master_bus_handle_t bus);

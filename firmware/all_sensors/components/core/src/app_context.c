@@ -254,6 +254,28 @@ esp_err_t app_context_get_sensor_data(sensor_data_t *out)
     return ESP_OK;
 }
 
+void app_context_set_soil_status(soil_status_t status)
+{
+    if (!s_initialized || !lock_ctx(pdMS_TO_TICKS(20))) {
+        return;
+    }
+    s_ctx.soil_status = status;
+    unlock_ctx();
+}
+
+soil_status_t app_context_get_soil_status(void)
+{
+    soil_status_t status = SOIL_STATUS_UNKNOWN;
+    if (!s_initialized) {
+        return SOIL_STATUS_UNKNOWN;
+    }
+    if (lock_ctx(pdMS_TO_TICKS(20))) {
+        status = s_ctx.soil_status;
+        unlock_ctx();
+    }
+    return status;
+}
+
 esp_err_t app_context_set_display_bus(i2c_master_bus_handle_t bus)
 {
     if (!s_initialized) {

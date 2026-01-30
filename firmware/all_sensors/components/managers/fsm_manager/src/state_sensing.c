@@ -25,6 +25,38 @@ static bool threshold_u16_invalid(uint16_t min, uint16_t max)
     return (max <= min);
 }
 
+static soil_status_t compute_soil_status(const sensor_data_t *data, const config_t *cfg, bool soil_ok, bool has_cfg)
+{
+    if (!soil_ok || data == NULL || cfg == NULL || !has_cfg) {
+        return SOIL_STATUS_UNKNOWN;
+    }
+
+    uint8_t min = cfg->plant_config.moi[0];
+    uint8_t max = cfg->plant_config.moi[1];
+    if (threshold_u8_invalid(min, max)) {
+        return SOIL_STATUS_UNKNOWN;
+    }
+
+    if (data->soil_moisture <= min) {
+        return SOIL_STATUS_TOO_DRY;
+    }
+    if (data->soil_moisture >= max) {
+        return SOIL_STATUS_TOO_WET;
+    }
+    return SOIL_STATUS_OK;
+}
+
+static const char *soil_status_str(soil_status_t status)
+{
+    switch (status) {
+        case SOIL_STATUS_TOO_DRY: return "TOO_DRY";
+        case SOIL_STATUS_OK: return "OK";
+        case SOIL_STATUS_TOO_WET: return "TOO_WET";
+        case SOIL_STATUS_UNKNOWN: return "UNKNOWN";
+        default: return "UNKNOWN";
+    }
+}
+
 static void display_sensor_data(const sensor_data_t *data)
 {
     if (data == NULL) {
@@ -124,11 +156,19 @@ void state_sensing_on_enter(void)
     }
 
     ESP_LOGI(TAG, "start soil sync");
-    if (soil_sensor_read_once(&shared) != ESP_OK) {
+    bool soil_ok = (soil_sensor_read_once(&shared) == ESP_OK);
+    if (!soil_ok) {
         ESP_LOGW(TAG, "soil sync failed");
     }
 
     (void)app_context_set_sensor_data(&data);
+    config_t cfg = {0};
+    bool has_cfg = (app_context_get_config(&cfg) == ESP_OK);
+    soil_status_t soil_status = compute_soil_status(&data, &cfg, soil_ok, has_cfg);
+    app_context_set_soil_status(soil_status);
+    ESP_LOGI(TAG, "soil status=%s moisture=%u%%",
+             soil_status_str(soil_status),
+             (unsigned)data.soil_moisture);
     if (app_context_display_on_wakeup()) {
         display_sensor_data(&data);
     }

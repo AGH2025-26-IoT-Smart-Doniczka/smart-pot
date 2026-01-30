@@ -20,6 +20,16 @@ typedef struct {
     float pressure;         // hPa
 } sensor_data_t;
 
+/* =========================================================================
+   SECTION: Soil Status
+   ========================================================================= */
+typedef enum {
+    SOIL_STATUS_UNKNOWN = 0,
+    SOIL_STATUS_TOO_DRY,
+    SOIL_STATUS_OK,
+    SOIL_STATUS_TOO_WET
+} soil_status_t;
+
 // Configuration structure
 typedef struct {
     char ssid[32];
