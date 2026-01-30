@@ -20,7 +20,7 @@ class TelemetryMqttMessage(BaseModel):
 
 
 class ConfigChangeMqttRequest(BaseModel):
-    lux: int
+    lux: int | None = None
     moi: tuple[int, int]
     tem: tuple[float, float]
     mes: int

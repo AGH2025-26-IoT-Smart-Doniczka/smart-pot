@@ -309,9 +309,7 @@ class _PotHistoryScreenState extends State<PotHistoryScreen> {
                     LineChartBarData(
                       spots: avgSpots,
                       color: color,
-                      isCurved: true,
-                      curveSmoothness: 0.5,
-                      preventCurveOverShooting: true,
+                      isCurved: false,
                       barWidth: 2.5,
                       dotData: const FlDotData(show: false),
                     ),

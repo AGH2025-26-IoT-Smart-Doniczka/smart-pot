@@ -86,8 +86,11 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
       minutes: _sendMinutesController,
       secs: _sendSecondsController,
     );
-    if (widget.pot.config.wateringIntervalSec != null) {
+    if (widget.pot.config.wateringDurationSec != null ||
+        widget.pot.config.wateringIntervalSec != null) {
       _autoWateringEnabled = true;
+    }
+    if (widget.pot.config.wateringIntervalSec != null) {
       _wateringIntervalSec = widget.pot.config.wateringIntervalSec ?? 0;
       _wateringPeriodController.text = _formatDurationForPicker(
         _wateringIntervalSec,
@@ -156,11 +159,12 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
     final maxMoisture = int.parse(_maxMoistureController.text.trim());
     final measureInterval = _measurementIntervalSec;
     final sendInterval = _sendIntervalSec;
-    final wateringInterval = _autoWateringEnabled ? _wateringIntervalSec : null;
+    final wateringInterval =
+        _autoWateringEnabled && _wateringIntervalSec > 0
+        ? _wateringIntervalSec
+        : null;
     final wateringDuration =
-        _autoWateringEnabled &&
-            _wateringDurationSec > 0 &&
-            _wateringDurationSec <= 60
+        _autoWateringEnabled && _wateringDurationSec > 0
         ? _wateringDurationSec
         : null;
 
@@ -661,7 +665,7 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
               contentPadding: EdgeInsets.zero,
               title: const Text('Automatyczne podlewanie'),
               subtitle: const Text(
-                'Włącz automatyczne uruchamianie podlewania.',
+                'Włącz automatyczne podlewanie. Gdy roślina będzie potrzebować wody, zadbamy o jej nawodnienie.',
               ),
               value: _autoWateringEnabled,
               onChanged: (value) {
@@ -672,65 +676,8 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
             ),
             const SizedBox(height: 8),
             kIsWeb
-                ? _buildWebDurationFields(
-                    label: 'Okres podlewania',
-                    hoursController: _wateringHoursController,
-                    minutesController: _wateringMinutesController,
-                    secondsController: _wateringSecondsController,
-                    enabled: _autoWateringEnabled,
-                    onChanged: (value) {
-                      setState(() {
-                        _wateringIntervalSec = value;
-                      });
-                    },
-                    validator: () {
-                      if (!_autoWateringEnabled) {
-                        return null;
-                      }
-                      if (_wateringIntervalSec <= 0) {
-                        return 'Podaj okres podlewania.';
-                      }
-                      return null;
-                    },
-                  )
-                : TextFormField(
-                    controller: _wateringPeriodController,
-                    decoration: const InputDecoration(
-                      labelText: 'Okres podlewania',
-                      hintText: 'Wybierz czas',
-                      border: OutlineInputBorder(),
-                    ),
-                    enabled: _autoWateringEnabled,
-                    readOnly: true,
-                    onTap: _autoWateringEnabled
-                        ? () async {
-                            final picked = await _showDurationPicker(
-                              context,
-                              initialSeconds: _wateringIntervalSec,
-                            );
-                            if (picked == null) return;
-                            setState(() {
-                              _wateringIntervalSec = picked;
-                              _wateringPeriodController.text =
-                                  _formatDurationForPicker(picked);
-                            });
-                          }
-                        : null,
-                    textInputAction: TextInputAction.done,
-                    validator: (_) {
-                      if (!_autoWateringEnabled) {
-                        return null;
-                      }
-                      if (_wateringIntervalSec <= 0) {
-                        return 'Podaj okres podlewania.';
-                      }
-                      return null;
-                    },
-                  ),
-            const SizedBox(height: 24),
-            kIsWeb
                 ? _buildWebSecondsField(
-                    label: 'Czas podlewania (opcjonalnie)',
+                    label: 'Czas podlewania',
                     secondsController: _wateringDurationSecondsController,
                     enabled: _autoWateringEnabled,
                     onChanged: (value) {
@@ -754,21 +701,26 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
                 : TextFormField(
                     controller: _wateringDurationController,
                     decoration: const InputDecoration(
-                      labelText: 'Czas podlewania (opcjonalnie)',
-                      hintText: 'Sekundy (1-60)',
+                      labelText: 'Czas podlewania',
                       border: OutlineInputBorder(),
                     ),
                     enabled: _autoWateringEnabled,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      _MaxSecondsTextInputFormatter(maxSeconds: 60),
-                    ],
-                    onChanged: (value) {
-                      setState(() {
-                        _wateringDurationSec = int.tryParse(value.trim()) ?? 0;
-                      });
-                    },
+                    readOnly: true,
+                    onTap: _autoWateringEnabled
+                        ? () async {
+                            final picked = await _showDurationPicker(
+                              context,
+                              initialSeconds: _wateringDurationSec,
+                              secondsOnly: true,
+                            );
+                            if (picked == null) return;
+                            setState(() {
+                              _wateringDurationSec = picked;
+                              _wateringDurationController.text =
+                                  _wateringDurationSec.toString();
+                            });
+                          }
+                        : null,
                     textInputAction: TextInputAction.done,
                     validator: (_) {
                       if (!_autoWateringEnabled) {
@@ -779,6 +731,56 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
                       }
                       if (_wateringDurationSec > 60) {
                         return 'Maksymalnie 60 sekund.';
+                      }
+                      return null;
+                    },
+                  ),
+            const SizedBox(height: 24),
+            kIsWeb
+                ? _buildWebDurationFields(
+                    label: '(Opcjonalnie) Interwał podlewania',
+                    hoursController: _wateringHoursController,
+                    minutesController: _wateringMinutesController,
+                    secondsController: _wateringSecondsController,
+                    enabled: _autoWateringEnabled,
+                    onChanged: (value) {
+                      setState(() {
+                        _wateringIntervalSec = value;
+                      });
+                    },
+                    validator: () {
+                      if (!_autoWateringEnabled) {
+                        return null;
+                      }
+                      return null;
+                    },
+                  )
+                : TextFormField(
+                    controller: _wateringPeriodController,
+                    decoration: const InputDecoration(
+                      labelText: '(Opcjonalnie) Interwał podlewania',
+                      border: OutlineInputBorder(),
+                    ),
+                    enabled: _autoWateringEnabled,
+                    readOnly: true,
+                    onTap: _autoWateringEnabled
+                        ? () async {
+                            final picked = await _showDurationPicker(
+                              context,
+                              initialSeconds: _wateringIntervalSec,
+                            );
+                            if (picked == null) return;
+                            setState(() {
+                              _wateringIntervalSec = picked;
+                              _wateringPeriodController.text =
+                                  _formatDurationForPicker(picked);
+                            });
+                          }
+                        : null,
+                    textInputAction: TextInputAction.done,
+                    validator: (_) {
+                      if (!_autoWateringEnabled) {
+                        return null;
                       }
                       return null;
                     },
@@ -1274,6 +1276,7 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
   Future<int?> _showDurationPicker(
     BuildContext context, {
     required int initialSeconds,
+    bool secondsOnly = false,
   }) async {
     const int minute = 60;
     const int hour = 60 * minute;
@@ -1283,6 +1286,7 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
     final initialHours = (initialSeconds % day) ~/ hour;
     final initialMinutes = (initialSeconds % hour) ~/ minute;
     final initialSecs = initialSeconds % minute;
+    final initialSecsOnly = initialSeconds.clamp(0, 60);
 
     return showModalBottomSheet<int>(
       context: context,
@@ -1290,7 +1294,7 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
         int days = initialDays;
         int hours = initialHours;
         int minutes = initialMinutes;
-        int seconds = initialSecs;
+        int seconds = secondsOnly ? initialSecsOnly : initialSecs;
 
         return StatefulBuilder(
           builder: (context, setModalState) {
@@ -1312,11 +1316,12 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
                         const Spacer(),
                         TextButton(
                           onPressed: () {
-                            final total =
-                                (days * day) +
-                                (hours * hour) +
-                                (minutes * minute) +
-                                seconds;
+                            final total = secondsOnly
+                                ? seconds
+                                : (days * day) +
+                                    (hours * hour) +
+                                    (minutes * minute) +
+                                    seconds;
                             Navigator.of(context).pop(total);
                           },
                           child: const Text('Zapisz'),
@@ -1326,29 +1331,33 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
                   ),
                   Row(
                     children: [
-                      _buildPickerColumn(
-                        label: 'd',
-                        itemCount: 31,
-                        initialItem: days,
-                        onChanged: (value) => setModalState(() => days = value),
-                      ),
-                      _buildPickerColumn(
-                        label: 'h',
-                        itemCount: 24,
-                        initialItem: hours,
-                        onChanged: (value) =>
-                            setModalState(() => hours = value),
-                      ),
-                      _buildPickerColumn(
-                        label: 'm',
-                        itemCount: 60,
-                        initialItem: minutes,
-                        onChanged: (value) =>
-                            setModalState(() => minutes = value),
-                      ),
+                      if (!secondsOnly)
+                        _buildPickerColumn(
+                          label: 'd',
+                          itemCount: 31,
+                          initialItem: days,
+                          onChanged: (value) =>
+                              setModalState(() => days = value),
+                        ),
+                      if (!secondsOnly)
+                        _buildPickerColumn(
+                          label: 'h',
+                          itemCount: 24,
+                          initialItem: hours,
+                          onChanged: (value) =>
+                              setModalState(() => hours = value),
+                        ),
+                      if (!secondsOnly)
+                        _buildPickerColumn(
+                          label: 'm',
+                          itemCount: 60,
+                          initialItem: minutes,
+                          onChanged: (value) =>
+                              setModalState(() => minutes = value),
+                        ),
                       _buildPickerColumn(
                         label: 's',
-                        itemCount: 60,
+                        itemCount: secondsOnly ? 61 : 60,
                         initialItem: seconds,
                         onChanged: (value) =>
                             setModalState(() => seconds = value),

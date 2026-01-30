@@ -125,8 +125,8 @@ def list_user_pots(authorization: str | None = Header(default=None)):
                     "watering_duration_sec": cfg.get("watering_duration_sec"),
                     "max_temp": cfg.get("max_temp"),
                     "min_temp": cfg.get("min_temp"),
-                    "min_moisture": cfg.get("min_moisture") or 0,
-                    "max_moisture": cfg.get("max_moisture") or 0,
+                    "min_moisture": cfg.get("min_moisture") or 30,
+                    "max_moisture": cfg.get("max_moisture") or 70,
                     "illuminance": ILLUMINANCE_REVERSE.get(cfg.get("illuminance"), "medium"),
                 },
             }
