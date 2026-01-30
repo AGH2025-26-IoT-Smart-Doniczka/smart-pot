@@ -149,10 +149,13 @@ class _DeviceTreeState extends State<DeviceTree> {
         }
       }
 
+      final String? ssidToSend = ssid.isNotEmpty ? ssid : null;
+      final String? passToSend = pass.isNotEmpty ? pass : null;
+
       await BleService().writeConfiguration(
         device: _connectedDevice!,
-        ssid: ssid,
-        wifiPass: pass,
+        ssid: ssidToSend,
+        wifiPass: passToSend,
         mqttPass: mqttPass,
         mqttUser: mqttUser,
         customConfig: config,

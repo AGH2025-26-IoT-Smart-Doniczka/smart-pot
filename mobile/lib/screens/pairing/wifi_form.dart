@@ -31,8 +31,7 @@ class _WifiFormState extends State<WifiForm> {
   @override
   void initState() {
     super.initState();
-    // If hard reset, we MUST show config
-    _showConfig = widget.isHardReset;
+    _showConfig = false;
   }
 
   @override
@@ -65,7 +64,7 @@ class _WifiFormState extends State<WifiForm> {
             ),
           ),
           SizedBox(height: 30),
-          if (!widget.isHardReset && !_showConfig) ...[
+          if (!_showConfig) ...[
              Container(
               padding: EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -81,7 +80,9 @@ class _WifiFormState extends State<WifiForm> {
                       SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          "Urządzenie wstępnie skonfigurowane. Aktualizujemy tylko Wi-Fi.",
+                          widget.isHardReset
+                              ? "To pierwsza konfiguracja. Podaj dane Wi‑Fi, a pozostałe ustawienia możesz rozwinąć."
+                              : "Możesz zostawić pola Wi‑Fi puste, aby zachować poprzednie ustawienia.",
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -183,11 +184,38 @@ class _WifiFormState extends State<WifiForm> {
   }
 
   void _handleSubmit() {
-    if (_ssidController.text.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Podaj nazwę sieci")));
-      return;
+    final ssid = _ssidController.text.trim();
+    final pass = _passController.text;
+    if (widget.isHardReset) {
+      if (ssid.isEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Podaj nazwę sieci")));
+        return;
+      }
+      if (pass.isEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Podaj hasło do sieci")));
+        return;
+      }
+    } else {
+      if (ssid.isNotEmpty && pass.isEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(
+          SnackBar(content: Text("Podaj hasło do podanej sieci")),
+        );
+        return;
+      }
+      if (ssid.isEmpty && pass.isNotEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(
+          SnackBar(content: Text("Podaj nazwę sieci dla hasła")),
+        );
+        return;
+      }
     }
 
     Map<String, dynamic>? config;
@@ -242,6 +270,6 @@ class _WifiFormState extends State<WifiForm> {
       };
     }
 
-    widget.onSubmit(_ssidController.text, _passController.text, config);
+    widget.onSubmit(ssid, pass, config);
   }
 }

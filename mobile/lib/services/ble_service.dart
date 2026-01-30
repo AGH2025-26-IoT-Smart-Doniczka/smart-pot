@@ -54,30 +54,26 @@ class BleService {
 
   Future<void> writeConfiguration({
     required BleDevice device,
-    required String ssid,
-    required String wifiPass,
+    String? ssid,
+    String? wifiPass,
     String? mqttUser,
     String? mqttPass,
     Map<String, dynamic>? customConfig,
     bool sendConfig = true,
   }) async {
     try {
-      await device.writeCharacteristic(
-        SERVICE_UUID,
-        CHARACTERISTICS_SSID_UUID,
-        utf8.encode(ssid),
-      );
-      await device.writeCharacteristic(
-        SERVICE_UUID,
-        CHARACTERISTICS_PASS_UUID,
-        utf8.encode(wifiPass),
-      );
-
-      if (mqttPass != null) {
+      if (ssid != null && ssid.isNotEmpty) {
         await device.writeCharacteristic(
           SERVICE_UUID,
-          CHARACTERISTICS_MQTT_PASS,
-          utf8.encode(mqttPass),
+          CHARACTERISTICS_SSID_UUID,
+          utf8.encode(ssid),
+        );
+      }
+      if (wifiPass != null && wifiPass.isNotEmpty) {
+        await device.writeCharacteristic(
+          SERVICE_UUID,
+          CHARACTERISTICS_PASS_UUID,
+          utf8.encode(wifiPass),
         );
       }
 
@@ -93,6 +89,14 @@ class BleService {
           SERVICE_UUID,
           CHARACTERISTICS_CONFIG_UUID,
           configBytes,
+        );
+      }
+
+      if (mqttPass != null) {
+        await device.writeCharacteristic(
+          SERVICE_UUID,
+          CHARACTERISTICS_MQTT_PASS,
+          utf8.encode(mqttPass),
         );
       }
     } catch (e) {
