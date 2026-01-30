@@ -62,6 +62,7 @@ static const char *fsm_event_str(app_event_id_t event_id)
     switch (event_id) {
         case APP_EVENT_CONFIG_LOADED: return "CONFIG_LOADED";
         case APP_EVENT_NO_CONFIG: return "NO_CONFIG";
+        case APP_EVENT_NEEDS_PROVISIONING: return "NEEDS_PROVISIONING";
         case APP_EVENT_PROV_CONNECTED: return "PROV_CONNECTED";
         case APP_EVENT_PROV_DATA_RECVD: return "PROV_DATA_RECVD";
         case APP_EVENT_PROV_TIMEOUT: return "PROV_TIMEOUT";
@@ -284,6 +285,9 @@ static void fsm_handle_state_init(app_event_id_t event_id)
     switch (event_id) {
         case APP_EVENT_CONFIG_LOADED:
             fsm_transition(STATE_SENSING, "config loaded");
+            break;
+        case APP_EVENT_NEEDS_PROVISIONING:
+            fsm_transition(STATE_PROVISIONING, "needs provisioning");
             break;
         case APP_EVENT_NO_CONFIG:
             fsm_transition(STATE_CALIB_SOIL_DRY, "config missing -> calibrate");

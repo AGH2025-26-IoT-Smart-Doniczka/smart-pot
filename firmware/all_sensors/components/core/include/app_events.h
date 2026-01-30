@@ -18,6 +18,7 @@ typedef enum {
     // Initialization 
     APP_EVENT_CONFIG_LOADED = 0,    
     APP_EVENT_NO_CONFIG,           
+    APP_EVENT_NEEDS_PROVISIONING,
 
     // Provisioning
     APP_EVENT_PROV_CONNECTED,       
@@ -67,5 +68,4 @@ typedef sensor_data_t sensor_event_data_t;
 typedef struct {
    uint16_t duration_s;
 } watering_request_t;
-
 

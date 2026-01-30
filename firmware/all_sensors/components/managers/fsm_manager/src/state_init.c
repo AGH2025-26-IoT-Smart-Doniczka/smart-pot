@@ -110,7 +110,15 @@ void state_init_on_enter(void)
              (int)ssid_len, cfg.ssid);
         (void)fsm_manager_post_event(APP_EVENT_CONFIG_LOADED, NULL, 0, 0);
     } else {
-        (void)fsm_manager_post_event(APP_EVENT_NO_CONFIG, NULL, 0, 0);
+        const bool soil_cal_ok = (cfg.soil_adc_dry != 0U) &&
+                                 (cfg.soil_adc_wet != 0U) &&
+                                 (cfg.soil_adc_wet < cfg.soil_adc_dry);
+        if (soil_cal_ok) {
+            (void)app_context_set_config(&cfg);
+            (void)fsm_manager_post_event(APP_EVENT_NEEDS_PROVISIONING, NULL, 0, 0);
+        } else {
+            (void)fsm_manager_post_event(APP_EVENT_NO_CONFIG, NULL, 0, 0);
+        }
     }
 }
 
