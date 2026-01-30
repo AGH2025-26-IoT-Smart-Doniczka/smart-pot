@@ -18,7 +18,7 @@
 /* =========================================================================
    SECTION: Constants
    ========================================================================= */
-#define MQTT_BROKER_HOST          "172.20.10.2"
+#define MQTT_BROKER_HOST          "192.168.0.220"
 #define MQTT_BROKER_PORT          1883
 
 #define MQTT_TOPIC_BUF_LEN        96
