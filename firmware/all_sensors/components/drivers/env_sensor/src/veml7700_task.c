@@ -17,8 +17,6 @@
 #define VEML7700_TASK_STACK     4096
 #define VEML7700_TASK_PRIO      5
 
-#define LUX_LOW_THRESHOLD       300.0f
-#define LUX_HIGH_THRESHOLD      1000.0f
 
 /* =========================================================================
    SECTION: Static Data
@@ -28,24 +26,19 @@ static const char *TAG = "VEML_TASK";
 /* =========================================================================
    SECTION: Helpers
    ========================================================================= */
-static uint16_t lux_to_level(float lux)
-{
-    if (lux < LUX_LOW_THRESHOLD) {
-        return 2U;
-    }
-    if (lux < LUX_HIGH_THRESHOLD) {
-        return 1U;
-    }
-    return 0U;
-}
-
 static void veml7700_update_context(const sensor_task_context_t *shared, float lux)
 {
     if (shared == NULL || shared->data == NULL) {
         return;
     }
 
-    shared->data->lux_level = (uint16_t)lux_to_level(lux);
+    if (lux < 0.0f) {
+        lux = 0.0f;
+    }
+    if (lux > 65535.0f) {
+        lux = 65535.0f;
+    }
+    shared->data->lux_level = (uint16_t)(lux + 0.5f);
 }
 
 static uint32_t veml7700_get_integration_ms(uint16_t config)

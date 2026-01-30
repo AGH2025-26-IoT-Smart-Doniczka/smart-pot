@@ -16,6 +16,7 @@
 #include "ssd1306_images.h"
 #include "buttons_manager.h"
 #include "mqtt_manager.h"
+#include "watering_manager.h"
 
 ESP_EVENT_DEFINE_BASE(APP_EVENTS);
 
@@ -67,13 +68,16 @@ static const char *fsm_event_str(app_event_id_t event_id)
         case APP_EVENT_REQUIRES_CALIBRATION: return "REQUIRES_CALIBRATION";
         case APP_EVENT_WIFI_CONNECTED: return "WIFI_CONNECTED";
         case APP_EVENT_WIFI_DISCONNECTED: return "WIFI_DISCONNECTED";
-        case APP_EVENT_TIME_SYNC_DONE: return "TIME_SYNC_DONE";
         case APP_EVENT_SENSORS_DATA_READY: return "SENSORS_DATA_READY";
         case APP_EVENT_CALIB_TIMEOUT: return "CALIB_TIMEOUT";
-        case APP_EVENT_DECISION_MQTT: return "DECISION_MQTT";
         case APP_EVENT_DECISION_STORAGE: return "DECISION_STORAGE";
+        case APP_EVENT_DECISION_WATER_DONE: return "DECISION_WATER_DONE";
+        case APP_EVENT_DECISION_SYNC_WIFI: return "DECISION_SYNC_WIFI";
+        case APP_EVENT_DECISION_SYNC_STORAGE: return "DECISION_SYNC_STORAGE";
         case APP_EVENT_MQTT_PUBLISHED: return "MQTT_PUBLISHED";
         case APP_EVENT_STORAGE_SAVED: return "STORAGE_SAVED";
+        case APP_EVENT_WATERING_REQUEST: return "WATERING_REQUEST";
+        case APP_EVENT_WATERING_DONE: return "WATERING_DONE";
         case APP_EVENT_IDLE_TIMEOUT: return "IDLE_TIMEOUT";
         case APP_EVENT_BTN1_SHORT: return "BTN1_SHORT";
         case APP_EVENT_BTN1_3S: return "BTN1_3S";
@@ -114,19 +118,19 @@ static void fsm_invoke_entry_action(app_state_t state)
                 s_fsm.callbacks.wifi_connect.on_enter();
             }
             break;
-        case STATE_SYNC_TIME:
-            if (s_fsm.callbacks.sync_time.on_enter) {
-                s_fsm.callbacks.sync_time.on_enter();
+        case STATE_DECISION_WATER:
+            if (s_fsm.callbacks.decision_water.on_enter) {
+                s_fsm.callbacks.decision_water.on_enter();
+            }
+            break;
+        case STATE_DECISION_SYNC:
+            if (s_fsm.callbacks.decision_sync.on_enter) {
+                s_fsm.callbacks.decision_sync.on_enter();
             }
             break;
         case STATE_SENSING:
             if (s_fsm.callbacks.sensing.on_enter) {
                 s_fsm.callbacks.sensing.on_enter();
-            }
-            break;
-        case STATE_DATA_DECISION:
-            if (s_fsm.callbacks.data_decision.on_enter) {
-                s_fsm.callbacks.data_decision.on_enter();
             }
             break;
         case STATE_MQTT_PUBLISH:
@@ -187,19 +191,19 @@ static void fsm_invoke_exit_action(app_state_t state, exit_mode_t mode)
                 s_fsm.callbacks.wifi_connect.on_exit(mode);
             }
             break;
-        case STATE_SYNC_TIME:
-            if (s_fsm.callbacks.sync_time.on_exit) {
-                s_fsm.callbacks.sync_time.on_exit(mode);
+        case STATE_DECISION_WATER:
+            if (s_fsm.callbacks.decision_water.on_exit) {
+                s_fsm.callbacks.decision_water.on_exit(mode);
+            }
+            break;
+        case STATE_DECISION_SYNC:
+            if (s_fsm.callbacks.decision_sync.on_exit) {
+                s_fsm.callbacks.decision_sync.on_exit(mode);
             }
             break;
         case STATE_SENSING:
             if (s_fsm.callbacks.sensing.on_exit) {
                 s_fsm.callbacks.sensing.on_exit(mode);
-            }
-            break;
-        case STATE_DATA_DECISION:
-            if (s_fsm.callbacks.data_decision.on_exit) {
-                s_fsm.callbacks.data_decision.on_exit(mode);
             }
             break;
         case STATE_MQTT_PUBLISH:
@@ -336,10 +340,14 @@ static void fsm_handle_state_wifi_connect(app_event_id_t event_id)
 {
     switch (event_id) {
         case APP_EVENT_WIFI_CONNECTED:
-            fsm_transition(STATE_SYNC_TIME, "wifi connected");
+            if (app_context_is_wifi_connected()) {
+                fsm_transition(STATE_MQTT_PUBLISH, "wifi connected -> mqtt");
+            } else {
+                fsm_transition(STATE_FLASH_STORE, "wifi connected -> offline store");
+            }
             break;
         case APP_EVENT_WIFI_DISCONNECTED:
-            fsm_transition(STATE_DATA_DECISION, "wifi unavailable");
+            fsm_transition(STATE_FLASH_STORE, "wifi unavailable");
             break;
         default:
             ESP_LOGW(TAG, "WIFI_CONNECT ignoring event %s", fsm_event_str(event_id));
@@ -347,17 +355,29 @@ static void fsm_handle_state_wifi_connect(app_event_id_t event_id)
     }
 }
 
-static void fsm_handle_state_sync_time(app_event_id_t event_id)
+static void fsm_handle_state_decision_water(app_event_id_t event_id)
 {
     switch (event_id) {
-        case APP_EVENT_TIME_SYNC_DONE:
-            fsm_transition(STATE_DATA_DECISION, "time sync done");
-            break;
-        case APP_EVENT_WIFI_DISCONNECTED:
-            fsm_transition(STATE_DATA_DECISION, "sync offline");
+        case APP_EVENT_DECISION_WATER_DONE:
+            fsm_transition(STATE_DECISION_SYNC, "decision water done");
             break;
         default:
-            ESP_LOGW(TAG, "SYNC_TIME ignoring event %s", fsm_event_str(event_id));
+            ESP_LOGW(TAG, "DECISION_WATER ignoring event %s", fsm_event_str(event_id));
+            break;
+    }
+}
+
+static void fsm_handle_state_decision_sync(app_event_id_t event_id)
+{
+    switch (event_id) {
+        case APP_EVENT_DECISION_SYNC_WIFI:
+            fsm_transition(STATE_WIFI_CONNECT, "decision sync wifi");
+            break;
+        case APP_EVENT_DECISION_SYNC_STORAGE:
+            fsm_transition(STATE_FLASH_STORE, "decision sync storage");
+            break;
+        default:
+            ESP_LOGW(TAG, "DECISION_SYNC ignoring event %s", fsm_event_str(event_id));
             break;
     }
 }
@@ -366,28 +386,10 @@ static void fsm_handle_state_sensing(app_event_id_t event_id)
 {
     switch (event_id) {
         case APP_EVENT_SENSORS_DATA_READY:
-            fsm_transition(STATE_WIFI_CONNECT, "sensing done");
+            fsm_transition(STATE_DECISION_WATER, "sensing done");
             break;
         default:
             ESP_LOGW(TAG, "SENSING ignoring event %s", fsm_event_str(event_id));
-            break;
-    }
-}
-
-static void fsm_handle_state_decision(app_event_id_t event_id)
-{
-    switch (event_id) {
-        case APP_EVENT_DECISION_MQTT:
-            fsm_transition(STATE_MQTT_PUBLISH, "decision mqtt");
-            break;
-        case APP_EVENT_DECISION_STORAGE:
-            fsm_transition(STATE_FLASH_STORE, "decision storage");
-            break;
-        case APP_EVENT_WIFI_DISCONNECTED:
-            fsm_transition(STATE_FLASH_STORE, "offline, store");
-            break;
-        default:
-            ESP_LOGW(TAG, "DATA_DECISION ignoring event %s", fsm_event_str(event_id));
             break;
     }
 }
@@ -426,7 +428,14 @@ static void fsm_handle_state_idle(app_event_id_t event_id)
 {
     switch (event_id) {
         case APP_EVENT_IDLE_TIMEOUT:
+            if (buttons_manager_is_any_pressed() || watering_manager_is_active()) {
+                state_idle_kick();
+                break;
+            }
             fsm_transition(STATE_DEEP_SLEEP, "idle timeout");
+            break;
+        case APP_EVENT_WATERING_DONE:
+            ESP_LOGI(TAG, "watering done in idle");
             break;
         default:
             ESP_LOGW(TAG, "IDLE ignoring event %s", fsm_event_str(event_id));
@@ -462,14 +471,14 @@ static void fsm_dispatch_event(app_event_id_t event_id)
         case STATE_WIFI_CONNECT:
             fsm_handle_state_wifi_connect(event_id);
             break;
-        case STATE_SYNC_TIME:
-            fsm_handle_state_sync_time(event_id);
+        case STATE_DECISION_WATER:
+            fsm_handle_state_decision_water(event_id);
+            break;
+        case STATE_DECISION_SYNC:
+            fsm_handle_state_decision_sync(event_id);
             break;
         case STATE_SENSING:
             fsm_handle_state_sensing(event_id);
-            break;
-        case STATE_DATA_DECISION:
-            fsm_handle_state_decision(event_id);
             break;
         case STATE_MQTT_PUBLISH:
             fsm_handle_state_mqtt_publish(event_id);
@@ -495,13 +504,25 @@ static void fsm_dispatch_event(app_event_id_t event_id)
 static void fsm_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
     (void) handler_args;
-    (void) event_data;
 
     if (base != APP_EVENTS) {
         return;
     }
 
     app_event_id_t id = (app_event_id_t)event_id;
+    if (id == APP_EVENT_WATERING_REQUEST) {
+        const watering_request_t *req = (const watering_request_t *)event_data;
+        uint16_t duration = (req != NULL) ? req->duration_s : 0U;
+        esp_err_t err = watering_manager_start_async(duration);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "watering request failed (%s)", esp_err_to_name(err));
+        }
+        if (s_fsm.state == STATE_IDLE) {
+            state_idle_kick();
+        }
+        return;
+    }
+
     if (fsm_handle_global_interrupts(id)) {
         return;
     }
@@ -546,9 +567,23 @@ esp_err_t fsm_manager_init(const fsm_callbacks_t *callbacks)
         return err;
     }
 
+    err = watering_manager_init(s_fsm.loop);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Watering manager init failed (%s)", esp_err_to_name(err));
+        esp_event_loop_delete(s_fsm.loop);
+        s_fsm.loop = NULL;
+        return err;
+    }
+
     err = buttons_manager_init(s_fsm.loop);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Buttons manager init failed (%s)", esp_err_to_name(err));
+        return err;
+    }
+
+    err = watering_manager_init(s_fsm.loop);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Watering manager init failed (%s)", esp_err_to_name(err));
         return err;
     }
 

@@ -6,25 +6,26 @@
 #include "esp_mac.h"
 #include "mqtt_client.h"
 #include "cJSON.h"
-#include "driver/gpio.h"
 #include "app_context.h"
 #include "app_types.h"
 #include "app_constants.h"
 #include "fsm_manager.h"
 #include "mqtt_manager.h"
 #include "nvs_manager.h"
+#include "json_config_parser.h"
+#include "watering_manager.h"
 
 /* =========================================================================
    SECTION: Constants
    ========================================================================= */
-#define MQTT_BROKER_HOST          "192.168.100.30"
+#define MQTT_BROKER_HOST          "172.20.10.2"
 #define MQTT_BROKER_PORT          1883
-#define MQTT_WATER_GPIO           GPIO_NUM_2
 
 #define MQTT_TOPIC_BUF_LEN        96
 #define MQTT_PAYLOAD_BUF_LEN      256
 #define MQTT_FAIL_WINDOW_US       (30LL * 1000LL * 1000LL)
 #define MQTT_FAIL_THRESHOLD       3
+#define MQTT_TIME_VALID_EPOCH_S   1700000000UL
 
 /* =========================================================================
    SECTION: Static Data
@@ -33,6 +34,7 @@ static const char *TAG = "MQTT_MGR";
 static esp_mqtt_client_handle_t s_client = NULL;
 static bool s_subscribed = false;
 static bool s_publish_pending = false;
+static bool s_connected = false;
 static int s_last_pub_id = -1;
 static char s_uuid[13] = {0};
 static uint32_t s_device_id = 0;
@@ -59,33 +61,26 @@ static void mqtt_build_uuid(void)
 }
 
 static void mqtt_build_topics(char *telemetry, size_t telemetry_len,
-                              char *setup, size_t setup_len,
-                              char *cfg_cmd, size_t cfg_cmd_len,
-                              char *water_cmd, size_t water_cmd_len,
-                              char *water_status, size_t water_status_len,
+                              char *cfg_topic, size_t cfg_topic_len,
+                              char *actions, size_t actions_len,
                               char *hard_reset, size_t hard_reset_len)
 {
     mqtt_build_uuid();
-    (void)snprintf(telemetry, telemetry_len, "devices/%s/telemetry", s_uuid);
-    (void)snprintf(setup, setup_len, "devices/%s/setup", s_uuid);
-    (void)snprintf(cfg_cmd, cfg_cmd_len, "devices/%s/config/cmd", s_uuid);
-    (void)snprintf(water_cmd, water_cmd_len, "devices/%s/watering/cmd", s_uuid);
-    (void)snprintf(water_status, water_status_len, "devices/%s/watering/status", s_uuid);
+    if (telemetry != NULL && telemetry_len > 0U) {
+        (void)snprintf(telemetry, telemetry_len, "devices/%s/telemetry", s_uuid);
+    }
+    if (cfg_topic != NULL && cfg_topic_len > 0U) {
+        (void)snprintf(cfg_topic, cfg_topic_len, "devices/%s/config", s_uuid);
+    }
+    if (actions != NULL && actions_len > 0U) {
+        (void)snprintf(actions, actions_len, "devices/%s/actions", s_uuid);
+    }
+    if (hard_reset != NULL && hard_reset_len > 0U) {
+        (void)snprintf(hard_reset, hard_reset_len, "devices/%s/hard-reset", s_uuid);
+    }
 
 }
 
-static void mqtt_gpio_init(void)
-{
-    gpio_config_t io = {
-        .pin_bit_mask = 1ULL << MQTT_WATER_GPIO,
-        .mode = GPIO_MODE_OUTPUT,
-        .pull_down_en = false,
-        .pull_up_en = false,
-        .intr_type = GPIO_INTR_DISABLE,
-    };
-    (void)gpio_config(&io);
-    gpio_set_level(MQTT_WATER_GPIO, 0);
-}
 
 static esp_err_t mqtt_publish_json(const char *topic, const char *payload, int qos)
 {
@@ -105,110 +100,110 @@ static esp_err_t mqtt_publish_json(const char *topic, const char *payload, int q
     return ESP_OK;
 }
 
-static double mqtt_next_timestamp_ms(uint32_t unix_ts)
+
+static uint32_t mqtt_next_timestamp_s(uint32_t unix_ts)
 {
-    double ts = 0.0;
-    if (unix_ts > 0U) {
-        ts = (double)unix_ts * 1000.0;
-    }
-    ts += (double)s_mqtt_msg_counter * 0.01;
-    s_mqtt_msg_counter++;
-    return ts;
+    return unix_ts + s_mqtt_msg_counter++;
 }
 
-static void mqtt_publish_watering_status(int water_on)
+static uint32_t mqtt_get_unix_ts(void)
 {
-    char topic[MQTT_TOPIC_BUF_LEN] = {0};
-    char dummy1[MQTT_TOPIC_BUF_LEN] = {0};
-    char dummy2[MQTT_TOPIC_BUF_LEN] = {0};
-    char dummy3[MQTT_TOPIC_BUF_LEN] = {0};
-    char dummy4[MQTT_TOPIC_BUF_LEN] = {0};
-    char dummy5[MQTT_TOPIC_BUF_LEN] = {0};
-    mqtt_build_topics(dummy1, sizeof(dummy1), dummy2, sizeof(dummy2), dummy3, sizeof(dummy3), dummy4, sizeof(dummy4), topic, sizeof(topic), dummy5, sizeof(dummy5));
-
-    char payload[64] = {0};
-    (void)snprintf(payload, sizeof(payload), "{\"water\":%d}", water_on ? 1 : 0);
-    (void)mqtt_publish_json(topic, payload, 1);
+    time_t now = time(NULL);
+    if (now > (time_t)MQTT_TIME_VALID_EPOCH_S) {
+        return (uint32_t)now;
+    }
+    if (app_context_is_time_synced()) {
+        ESP_LOGW(TAG, "time synced flag set but time invalid (%ld)", (long)now);
+    }
+    return 0U;
 }
 
-static void mqtt_apply_config(const cJSON *root)
+
+/* =========================================================================
+   SECTION: Topic Handlers
+   ========================================================================= */
+static void mqtt_handle_actions(const cJSON *root)
 {
-    if (root == NULL) {
-        return;
+    const cJSON *typ = cJSON_GetObjectItem(root, "typ");
+    const cJSON *data = cJSON_GetObjectItem(root, "data");
+    if (cJSON_IsString(typ)) {
+        ESP_LOGI(TAG, "action typ=%s", typ->valuestring);
+    } else {
+        ESP_LOGI(TAG, "action typ=<invalid>");
     }
-
-    const cJSON *lux = cJSON_GetObjectItem(root, "lux");
-    const cJSON *moi = cJSON_GetObjectItem(root, "moi");
-    const cJSON *tem = cJSON_GetObjectItem(root, "tem");
-    const cJSON *sle = cJSON_GetObjectItem(root, "sle");
-
-    if (!cJSON_IsNumber(lux) || !cJSON_IsArray(moi) || !cJSON_IsArray(tem) || !cJSON_IsNumber(sle)) {
-        ESP_LOGW(TAG, "config invalid");
-        return;
+    if (cJSON_IsObject(data)) {
+        char *data_json = cJSON_PrintUnformatted(data);
+        if (data_json != NULL) {
+            ESP_LOGI(TAG, "action data=%s", data_json);
+            cJSON_free(data_json);
+        } else {
+            ESP_LOGI(TAG, "action data=<unavailable>");
+        }
+    } else {
+        ESP_LOGI(TAG, "action data=<invalid>");
     }
+    if (cJSON_IsString(typ) && strcmp(typ->valuestring, "wtr") == 0) {
+        if (!cJSON_IsObject(data)) {
+            ESP_LOGW(TAG, "wtr action missing data");
+            return;
+        }
 
-    if ((cJSON_GetArraySize(moi) != 4) || (cJSON_GetArraySize(tem) != 2)) {
-        ESP_LOGW(TAG, "config invalid array sizes");
-        return;
+        const cJSON *dur = cJSON_GetObjectItem(data, "dur");
+        if (!cJSON_IsNumber(dur)) {
+            ESP_LOGW(TAG, "wtr action invalid duration");
+            return;
+        }
+
+        int duration = (int)dur->valuedouble;
+        if (duration < 1) {
+            ESP_LOGW(TAG, "wtr action duration too small (%d)", duration);
+            return;
+        }
+        if (duration > 60) {
+            duration = 60;
+        }
+
+        esp_err_t err = watering_manager_start_async((uint16_t)duration);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "wtr action start failed (%s)", esp_err_to_name(err));
+            return;
+        }
+        ESP_LOGI(TAG, "wtr action started dur=%d", duration);
     }
+}
 
+static void mqtt_handle_cfg(const char *json_str)
+{
     config_t cfg = {0};
     if (app_context_get_config(&cfg) != ESP_OK) {
         ESP_LOGW(TAG, "config read failed");
         return;
     }
 
-    cfg.plant_config.lux = (uint8_t)cJSON_GetNumberValue(lux);
-    for (int i = 0; i < 4; ++i) {
-        const cJSON *item = cJSON_GetArrayItem(moi, i);
-        if (!cJSON_IsNumber(item)) {
-            ESP_LOGW(TAG, "config invalid moi");
-            return;
-        }
-        cfg.plant_config.moi[i] = (uint8_t)cJSON_GetNumberValue(item);
+    esp_err_t err = json_config_parse(json_str, &cfg);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "cfg parse failed (%s)", esp_err_to_name(err));
+        return;
     }
-
-    for (int i = 0; i < 2; ++i) {
-        const cJSON *item = cJSON_GetArrayItem(tem, i);
-        if (!cJSON_IsNumber(item)) {
-            ESP_LOGW(TAG, "config invalid tem");
-            return;
-        }
-        cfg.plant_config.tem[i] = (uint16_t)cJSON_GetNumberValue(item);
-    }
-
-    cfg.plant_config.sleep_duration = (uint16_t)cJSON_GetNumberValue(sle);
-    cfg.sleep_duration = cfg.plant_config.sleep_duration;
 
     if (app_context_set_config(&cfg) == ESP_OK) {
         ESP_LOGI(TAG, "config updated from mqtt");
+        esp_err_t save_err = nvs_manager_save_config(&cfg);
+        if (save_err == ESP_OK) {
+            ESP_LOGI(TAG, "config saved to nvs");
+        } else {
+            ESP_LOGW(TAG, "config save failed (%s)", esp_err_to_name(save_err));
+        }
     }
 }
 
-static void mqtt_handle_watering(const cJSON *root)
+static void mqtt_handle_hard_reset(void)
 {
-    if (root == NULL) {
-        return;
-    }
+    ESP_LOGE(TAG, "HARD_RESET");
+    (void)fsm_manager_post_event(APP_EVENT_BTN1_10S, NULL, 0, 0);
 
-    const cJSON *dur = cJSON_GetObjectItem(root, "dur");
-    if (!cJSON_IsNumber(dur)) {
-        ESP_LOGW(TAG, "watering invalid");
-        return;
-    }
-
-    int duration = (int)cJSON_GetNumberValue(dur);
-    if (duration <= 0) {
-        ESP_LOGW(TAG, "watering duration invalid");
-        return;
-    }
-
-    gpio_set_level(MQTT_WATER_GPIO, 1);
-    mqtt_publish_watering_status(1);
-    vTaskDelay(pdMS_TO_TICKS((uint32_t)duration * 1000U));
-    gpio_set_level(MQTT_WATER_GPIO, 0);
-    mqtt_publish_watering_status(0);
 }
+
 
 static void mqtt_publish_telemetry_internal(void)
 {
@@ -216,32 +211,27 @@ static void mqtt_publish_telemetry_internal(void)
     (void)app_context_get_sensor_data(&data);
 
     char topic[MQTT_TOPIC_BUF_LEN] = {0};
-    char setup_topic[MQTT_TOPIC_BUF_LEN] = {0};
-    char cfg_topic[MQTT_TOPIC_BUF_LEN] = {0};
-    char water_topic[MQTT_TOPIC_BUF_LEN] = {0};
-    char water_status[MQTT_TOPIC_BUF_LEN] = {0};
+    char actions_topic[MQTT_TOPIC_BUF_LEN] = {0};
     char hard_reset[MQTT_TOPIC_BUF_LEN] = {0};
-    mqtt_build_topics(topic, sizeof(topic), setup_topic, sizeof(setup_topic), cfg_topic, sizeof(cfg_topic), water_topic, sizeof(water_topic), water_status, sizeof(water_status), hard_reset, sizeof(hard_reset));
+    mqtt_build_topics(topic, sizeof(topic), NULL, 0U, actions_topic, sizeof(actions_topic), hard_reset, sizeof(hard_reset));
 
     float temp_c = ((float)data.temperature / 10.0f) - 273.15f;
+    double temp_c_1dp = (double)((int)(temp_c * 10.0f + (temp_c >= 0.0f ? 0.5f : -0.5f))) / 10.0;
 
     cJSON *root = cJSON_CreateObject();
     if (root == NULL) {
         return;
     }
 
-    uint32_t unix_ts = 0;
-    if (app_context_is_time_synced()) {
-        unix_ts = (uint32_t)time(NULL);
-    }
-    cJSON_AddNumberToObject(root, "timestamp", mqtt_next_timestamp_ms(unix_ts));
+    uint32_t unix_ts = mqtt_get_unix_ts();
+    cJSON_AddNumberToObject(root, "ts", mqtt_next_timestamp_s(unix_ts));
 
     cJSON *payload = cJSON_AddObjectToObject(root, "data");
     if (payload != NULL) {
         cJSON_AddNumberToObject(payload, "lux", (int)data.lux_level);
-        cJSON_AddNumberToObject(payload, "tem", (double)temp_c);
+        cJSON_AddNumberToObject(payload, "tem", temp_c_1dp);
         cJSON_AddNumberToObject(payload, "moi", (int)data.soil_moisture);
-        cJSON_AddNumberToObject(payload, "pre", (double)data.pressure);
+        cJSON_AddNumberToObject(payload, "pre", (int)data.pressure);
     }
 
     char *json = cJSON_PrintUnformatted(root);
@@ -259,19 +249,24 @@ static esp_err_t mqtt_publish_sample_payload(const char *topic, const sensor_dat
     }
 
     float temp_c = ((float)data->temperature / 10.0f) - 273.15f;
+    double temp_c_1dp = (double)((int)(temp_c * 10.0f + (temp_c >= 0.0f ? 0.5f : -0.5f))) / 10.0;
+
+    if (timestamp == 0U) {
+        timestamp = mqtt_get_unix_ts();
+    }
 
     cJSON *root = cJSON_CreateObject();
     if (root == NULL) {
         return ESP_ERR_NO_MEM;
     }
 
-    cJSON_AddNumberToObject(root, "timestamp", mqtt_next_timestamp_ms(timestamp));
+    cJSON_AddNumberToObject(root, "ts", mqtt_next_timestamp_s(timestamp));
     cJSON *payload = cJSON_AddObjectToObject(root, "data");
     if (payload != NULL) {
         cJSON_AddNumberToObject(payload, "lux", (int)data->lux_level);
-        cJSON_AddNumberToObject(payload, "tem", (double)temp_c);
+        cJSON_AddNumberToObject(payload, "tem", temp_c_1dp);
         cJSON_AddNumberToObject(payload, "moi", (int)data->soil_moisture);
-        cJSON_AddNumberToObject(payload, "pre", (double)data->pressure);
+        cJSON_AddNumberToObject(payload, "pre", (int)data->pressure);
     }
 
     char *json = cJSON_PrintUnformatted(root);
@@ -299,12 +294,9 @@ static void mqtt_publish_stored_samples(void)
     }
 
     char topic[MQTT_TOPIC_BUF_LEN] = {0};
-    char setup_topic[MQTT_TOPIC_BUF_LEN] = {0};
-    char cfg_topic[MQTT_TOPIC_BUF_LEN] = {0};
-    char water_topic[MQTT_TOPIC_BUF_LEN] = {0};
-    char water_status[MQTT_TOPIC_BUF_LEN] = {0};
+    char actions_topic[MQTT_TOPIC_BUF_LEN] = {0};
     char hard_reset[MQTT_TOPIC_BUF_LEN] = {0};
-    mqtt_build_topics(topic, sizeof(topic), setup_topic, sizeof(setup_topic), cfg_topic, sizeof(cfg_topic), water_topic, sizeof(water_topic), water_status, sizeof(water_status), hard_reset, sizeof(hard_reset));
+    mqtt_build_topics(topic, sizeof(topic), NULL, 0U, actions_topic, sizeof(actions_topic), hard_reset, sizeof(hard_reset));
 
     bool all_ok = true;
     for (size_t i = 0; i < count; ++i) {
@@ -327,23 +319,40 @@ static void mqtt_handle_event_data(const esp_mqtt_event_handle_t event)
     }
 
     char cfg_topic[MQTT_TOPIC_BUF_LEN] = {0};
-    char water_topic[MQTT_TOPIC_BUF_LEN] = {0};
-    char dummy1[MQTT_TOPIC_BUF_LEN] = {0};
-    char dummy2[MQTT_TOPIC_BUF_LEN] = {0};
-    char dummy3[MQTT_TOPIC_BUF_LEN] = {0};
-    char dummy4[MQTT_TOPIC_BUF_LEN] = {0};
-    mqtt_build_topics(dummy1, sizeof(dummy1), dummy2, sizeof(dummy2), cfg_topic, sizeof(cfg_topic), water_topic, sizeof(water_topic), dummy3, sizeof(dummy3), dummy4, sizeof(dummy4));
+    char actions_topic[MQTT_TOPIC_BUF_LEN] = {0};
+    char hard_reset_topic[MQTT_TOPIC_BUF_LEN] = {0};
+    mqtt_build_topics(NULL, 0U, cfg_topic, sizeof(cfg_topic), actions_topic, sizeof(actions_topic), hard_reset_topic, sizeof(hard_reset_topic));
 
     if ((event->topic_len <= 0) || (event->data_len <= 0)) {
         return;
     }
 
+    const bool is_action = (strlen(actions_topic) == (size_t)event->topic_len) &&
+                           (strncmp(event->topic, actions_topic, event->topic_len) == 0);
     const bool is_cfg = (strlen(cfg_topic) == (size_t)event->topic_len) &&
                         (strncmp(event->topic, cfg_topic, event->topic_len) == 0);
-    const bool is_water = (strlen(water_topic) == (size_t)event->topic_len) &&
-                          (strncmp(event->topic, water_topic, event->topic_len) == 0);
+    const bool is_hard_reset = (strlen(hard_reset_topic) == (size_t)event->topic_len) &&
+                               (strncmp(event->topic, hard_reset_topic, event->topic_len) == 0);
 
-    if (!is_cfg && !is_water) {
+    if (!is_action && !is_cfg && !is_hard_reset) {
+        return;
+    }
+
+    if (is_hard_reset) {
+        mqtt_handle_hard_reset();
+        return;
+    }
+
+    if (event->data_len > MQTT_PAYLOAD_BUF_LEN) {
+        ESP_LOGW(TAG, "action payload too large (%d)", event->data_len);
+        return;
+    }
+
+    if (is_cfg) {
+        char cfg_json[MQTT_PAYLOAD_BUF_LEN + 1U] = {0};
+        memcpy(cfg_json, event->data, event->data_len);
+        cfg_json[event->data_len] = '\0';
+        mqtt_handle_cfg(cfg_json);
         return;
     }
 
@@ -353,10 +362,8 @@ static void mqtt_handle_event_data(const esp_mqtt_event_handle_t event)
         return;
     }
 
-    if (is_cfg) {
-        mqtt_apply_config(root);
-    } else if (is_water) {
-        mqtt_handle_watering(root);
+    if (is_action) {
+        mqtt_handle_actions(root);
     }
 
     cJSON_Delete(root);
@@ -392,6 +399,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     switch (event_id) {
         case MQTT_EVENT_CONNECTED: {
             ESP_LOGI(TAG, "mqtt connected");
+            s_connected = true;
             s_mqtt_fail_count = 0;
             s_mqtt_fail_window_start_us = 0;
 
@@ -399,15 +407,13 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
             if (!s_subscribed) {
                 char cfg_topic[MQTT_TOPIC_BUF_LEN] = {0};
-                char water_topic[MQTT_TOPIC_BUF_LEN] = {0};
-                char dummy1[MQTT_TOPIC_BUF_LEN] = {0};
-                char dummy2[MQTT_TOPIC_BUF_LEN] = {0};
-                char dummy3[MQTT_TOPIC_BUF_LEN] = {0};
-                char dummy4[MQTT_TOPIC_BUF_LEN] = {0};
-                mqtt_build_topics(dummy1, sizeof(dummy1), dummy2, sizeof(dummy2), cfg_topic, sizeof(cfg_topic), water_topic, sizeof(water_topic), dummy3, sizeof(dummy3), dummy4, sizeof(dummy4));
+                char actions_topic[MQTT_TOPIC_BUF_LEN] = {0};
+                char hard_reset_topic[MQTT_TOPIC_BUF_LEN] = {0};
+                mqtt_build_topics(NULL, 0U, cfg_topic, sizeof(cfg_topic), actions_topic, sizeof(actions_topic), hard_reset_topic, sizeof(hard_reset_topic));
 
                 (void)esp_mqtt_client_subscribe(s_client, cfg_topic, 1);
-                (void)esp_mqtt_client_subscribe(s_client, water_topic, 1);
+                (void)esp_mqtt_client_subscribe(s_client, actions_topic, 1);
+                (void)esp_mqtt_client_subscribe(s_client, hard_reset_topic, 1);
                 s_subscribed = true;
             }
 
@@ -428,10 +434,12 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             break;
         case MQTT_EVENT_ERROR:
             ESP_LOGW(TAG, "mqtt error");
+            s_connected = false;
             mqtt_track_failure_and_fallback();
             break;
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGW(TAG, "mqtt disconnected");
+            s_connected = false;
             mqtt_track_failure_and_fallback();
             break;
         default:
@@ -459,25 +467,47 @@ static esp_err_t mqtt_client_start_internal(void)
 
     mqtt_prepare_password();
     mqtt_build_uuid();
-    mqtt_gpio_init();
+
+    bool has_prior_connect = app_context_has_prior_connect();
+    ESP_LOGI(TAG, "mqtt session clean_start=%u", has_prior_connect ? 0U : 1U);
 
     char mqtt_uri[128] = {0};
     snprintf(mqtt_uri, sizeof(mqtt_uri), "mqtt://%s", MQTT_BROKER_HOST);
 
     esp_mqtt_client_config_t cfg = {
-        .broker.address.uri = mqtt_uri,
-        .broker.address.port = MQTT_BROKER_PORT,
-        .credentials.client_id = s_uuid,
-        .credentials.username = s_uuid,
-        .credentials.authentication.password = s_mqtt_pass,
-        .session.keepalive = 60,
-        .session.disable_clean_session = true,
+        .broker = {
+            .address = {
+                .uri = mqtt_uri,
+                .port = MQTT_BROKER_PORT,
+            },
+        },
+        .credentials = {
+            .client_id = s_uuid,
+            .username = s_uuid,
+            .authentication = {
+                .password = s_mqtt_pass,
+                
+            },
+        },
+        .session = {
+            .keepalive = 60,
+            .disable_clean_session = has_prior_connect,
+            .protocol_ver = MQTT_PROTOCOL_V_5,
+        },
     };
 
     s_client = esp_mqtt_client_init(&cfg);
     if (s_client == NULL) {
         return ESP_FAIL;
     }
+
+    esp_mqtt5_connection_property_config_t connect_property = {
+        .session_expiry_interval = has_prior_connect ? 0xFFFFFFFF : 0,
+        .maximum_packet_size = 1024,
+        .receive_maximum = 65535,
+        .topic_alias_maximum = 10,
+    };
+    esp_mqtt5_client_set_connect_property(s_client, &connect_property);
 
     esp_mqtt_client_register_event(s_client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     return esp_mqtt_client_start(s_client);
@@ -498,9 +528,11 @@ esp_err_t mqtt_manager_publish_telemetry(void)
         return err;
     }
 
-    s_publish_pending = true;
-   mqtt_publish_telemetry_internal();
-    s_publish_pending = false;
+    if (s_connected) {
+        mqtt_publish_telemetry_internal();
+    } else {
+        s_publish_pending = true;
+    }
     return ESP_OK;
 }
 
@@ -515,6 +547,7 @@ esp_err_t mqtt_manager_stop(void)
     s_client = NULL;
     s_subscribed = false;
     s_publish_pending = false;
+    s_connected = false;
     s_last_pub_id = -1;
     s_mqtt_fail_count = 0;
     s_mqtt_fail_window_start_us = 0;

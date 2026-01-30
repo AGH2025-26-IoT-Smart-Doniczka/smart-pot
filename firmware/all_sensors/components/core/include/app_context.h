@@ -16,15 +16,18 @@
    SECTION: Types
    ========================================================================= */
 typedef struct {
-    config_t config;             // provisioned configuration
-    bool wifi_connected;         // WiFi link state
-    bool time_synced;            // SNTP sync status
-    uint32_t data_block_seq;     // rolling sensor block number
-    sensor_data_t sensor_data;   // latest sensor readout
-    i2c_master_bus_handle_t bus_display;  // disposable bus handle for display
-    i2c_master_bus_handle_t bus_sensors;  // disposable bus handle for sensors
-    ssd1306_handle_t display;             // shared display handle
-    soil_sensor_handle_t soil_sensor;     // shared soil sensor handle
+   config_t config;             // provisioned configuration
+   bool wifi_connected;         // WiFi link state
+   bool time_synced;            // SNTP sync status
+   bool has_prior_connect;      // true after first successful WiFi connect
+   bool force_sync_on_wakeup;   // force sync after button wakeup
+   bool display_on_wakeup;      // show display after button wakeup
+   uint32_t data_block_seq;     // rolling sensor block number
+   sensor_data_t sensor_data;   // latest sensor readout
+   i2c_master_bus_handle_t bus_display;  // disposable bus handle for display
+   i2c_master_bus_handle_t bus_sensors;  // disposable bus handle for sensors
+   ssd1306_handle_t display;             // shared display handle
+   soil_sensor_handle_t soil_sensor;     // shared soil sensor handle
 } app_context_t;
 
 /* =========================================================================
@@ -40,6 +43,15 @@ bool app_context_is_wifi_connected(void);
 
 void app_context_set_time_synced(bool synced);
 bool app_context_is_time_synced(void);
+
+void app_context_set_has_prior_connect(bool connected_before);
+bool app_context_has_prior_connect(void);
+
+void app_context_set_force_sync_on_wakeup(bool force_sync);
+bool app_context_force_sync_on_wakeup(void);
+
+void app_context_set_display_on_wakeup(bool enable);
+bool app_context_display_on_wakeup(void);
 
 uint32_t app_context_next_data_block_seq(void);
 uint32_t app_context_peek_data_block_seq(void);

@@ -17,9 +17,19 @@
 #define BLE_CHAR_MQTT_PASS_UUID "5befb657-9ba7-4f37-8954-d8fc9ca0346c"
 
 // Configuration limits
-#define MAX_SSID_LENGTH 31
+#define MAX_SSID_LENGTH 32
 #define MAX_PASSWD_LENGTH 63
 #define MAX_POT_ID_LENGTH 6
+
+// Configuration defaults
+#define DEFAULT_MOI_MIN     30U
+#define DEFAULT_MOI_MAX     70U
+#define DEFAULT_TEM_MIN_DK  2931U
+#define DEFAULT_TEM_MAX_DK  3031U
+#define DEFAULT_MES_S       300U
+#define DEFAULT_SEN_S       900U
+#define DEFAULT_WAT_S       0U
+#define DEFAULT_WAI_S       0U
 
 // Sensor thresholds
 #define TEMP_THRESHOLD_COUNT 2

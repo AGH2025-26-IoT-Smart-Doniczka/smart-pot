@@ -22,6 +22,7 @@
 #include "app_events.h"
 #include "fsm_manager.h"
 #include "nvs_manager.h"
+#include "json_config_parser.h"
 #include "ble_provisioning.h"
 
 /* =========================================================================
@@ -29,13 +30,13 @@
    ========================================================================= */
 #define ADV_DEVICE_NAME           "SmartPot"
 #define PROV_TIMEOUT_US           (120ULL * 1000ULL * 1000ULL)
+#define PROV_AFTER_FIRST_US       (3ULL * 1000ULL * 1000ULL)
 #define PROV_BIT_SSID             (1U << 0)
 #define PROV_BIT_PASS             (1U << 1)
 #define PROV_BIT_CFG              (1U << 2)
 #define PROV_BIT_MQTT             (1U << 3)
 #define PROV_EVENT_MASK           (PROV_BIT_SSID | PROV_BIT_PASS | PROV_BIT_CFG | PROV_BIT_MQTT)
-#define PROV_MIN_CONFIG_LEN       11
-#define PROV_MAX_CONFIG_LEN       12
+#define PROV_MAX_CONFIG_LEN       200
 
 /* =========================================================================
    SECTION: Attribute Table
@@ -44,7 +45,7 @@ static const uint16_t PRIMARY_SERVICE_UUID = ESP_GATT_UUID_PRI_SERVICE;
 static const uint16_t CHAR_DECL_UUID = ESP_GATT_UUID_CHAR_DECLARE;
 static const uint8_t CHAR_PROP_READ_WRITE = ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE;
 static const uint8_t CHAR_PROP_WRITE_ONLY = ESP_GATT_CHAR_PROP_BIT_WRITE;
-// static const uint8_t CHAR_PROP_READ_ONLY = ESP_GATT_CHAR_PROP_BIT_READ;
+static const uint8_t CHAR_PROP_READ_ONLY = ESP_GATT_CHAR_PROP_BIT_READ;
 
 static uint8_t SERVICE_UUID_128[16] = {
     0xa2, 0x90, 0x94, 0x47, 0x7a, 0x7f, 0xd8, 0xb8,
@@ -66,7 +67,11 @@ static const uint8_t CHAR_MQTT_PASS_128[16] = {
     0x6c, 0x34, 0xa0, 0x9c, 0xfc, 0xd8, 0x54, 0x89,
     0x37, 0x4f, 0xa7, 0x9b, 0x57, 0xb6, 0xef, 0x5b
 };
-
+// 896a511e-7016-4a98-a001-dcc96b403ebd
+static const uint8_t CHAR_ESP_MAC_128[16] = {
+    0xbd, 0x3e, 0x40, 0x6b, 0xc9, 0xdc, 0x01, 0xa0,
+    0x98, 0x4a, 0x16, 0x70, 0x1e, 0x51, 0x6a, 0x89
+};
 
 enum {
     IDX_SVC = 0,
@@ -78,6 +83,8 @@ enum {
     IDX_CHAR_VAL_CFG,
     IDX_CHAR_MQTT_PASS,
     IDX_CHAR_VAL_MQTT_PASS,
+    IDX_CHAR_ESP_MAC,
+    IDX_CHAR_VAL_ESP_MAC,
     IDX_NB
 };
 
@@ -95,6 +102,7 @@ static bool s_complete_sent;
 static ssd1306_handle_t s_disp;
 static EventGroupHandle_t s_bits;
 static esp_timer_handle_t s_timeout_timer;
+static bool s_first_data_seen;
 static esp_ble_adv_params_t s_adv_params = {
     .adv_int_min = 0x40,
     .adv_int_max = 0x60,
@@ -108,6 +116,7 @@ static uint8_t s_ssid_value[sizeof(((config_t *)0)->ssid)] = {0};
 static uint8_t s_pass_value[sizeof(((config_t *)0)->passwd)] = {0};
 static uint8_t s_cfg_value[PROV_MAX_CONFIG_LEN] = {0};
 static uint8_t s_mqtt_pass_value[sizeof(((config_t *)0)->mqtt_passwd)] = {0};
+static uint8_t s_esp_mac_firstboot_value[13] = {0};
 static uint16_t s_mqtt_len = 0;
 static uint16_t s_uid_len = 0;
 
@@ -164,6 +173,17 @@ static const esp_gatts_attr_db_t s_gatt_db[IDX_NB] = {
          ESP_GATT_PERM_WRITE_ENC_MITM,
          sizeof(s_mqtt_pass_value), 0, s_mqtt_pass_value}
     },
+    [IDX_CHAR_ESP_MAC] = {
+        {ESP_GATT_AUTO_RSP},
+        {ESP_UUID_LEN_16, (uint8_t *)&CHAR_DECL_UUID, ESP_GATT_PERM_READ,
+            sizeof(uint8_t), sizeof(uint8_t), (uint8_t *)&CHAR_PROP_READ_ONLY}
+    },
+    [IDX_CHAR_VAL_ESP_MAC] = {
+        {ESP_GATT_AUTO_RSP},
+        {ESP_UUID_LEN_128, (uint8_t *)CHAR_ESP_MAC_128,
+         ESP_GATT_PERM_READ_ENC_MITM,
+         sizeof(s_esp_mac_firstboot_value), 0, s_esp_mac_firstboot_value}
+    },
 };
 
 /* =========================================================================
@@ -176,6 +196,8 @@ static void apply_if_complete(void);
 static void timeout_cb(void *arg);
 static void display_show_passkey(uint32_t passkey);
 static void display_clear(void);
+
+static void build_esp_mac_firstboot_value(uint8_t *out, size_t out_len);
 
 /* =========================================================================
    SECTION: Helpers
@@ -197,6 +219,7 @@ static void reset_session_state(void)
     (void)memset(s_mqtt_pass_value, 0, sizeof(s_mqtt_pass_value));
     s_mqtt_len = 0;
     s_complete_sent = false;
+    s_first_data_seen = false;
     if (s_bits) {
         (void)xEventGroupClearBits(s_bits, PROV_EVENT_MASK);
     }
@@ -268,6 +291,21 @@ static void display_clear(void)
     (void)ssd1306_flush(s_disp);
 }
 
+static void build_esp_mac_firstboot_value(uint8_t *out, size_t out_len)
+{
+    if (out == NULL || out_len < 13U) {
+        return;
+    }
+
+    uint8_t mac[6] = {0};
+    esp_read_mac(mac, ESP_MAC_BT);
+    (void)snprintf((char *)out, 13U,
+                   "%02X%02X%02X%02X%02X%02X",
+                   mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    bool prior_connect = app_context_has_prior_connect();
+    out[12] = (uint8_t)(prior_connect ? 1U : 0U);
+}
+
 
 static void start_timeout_timer(void)
 {
@@ -284,6 +322,17 @@ static void start_timeout_timer(void)
         return;
     }
     (void)esp_timer_start_once(s_timeout_timer, PROV_TIMEOUT_US);
+}
+
+static void shorten_timeout_after_first(void)
+{
+    if (s_first_data_seen || s_timeout_timer == NULL) {
+        return;
+    }
+
+    s_first_data_seen = true;
+    (void)esp_timer_stop(s_timeout_timer);
+    (void)esp_timer_start_once(s_timeout_timer, PROV_AFTER_FIRST_US);
 }
 
 static void timeout_cb(void *arg)
@@ -390,8 +439,10 @@ static void apply_if_complete(void)
     }
     ESP_LOGI(TAG, "prov mqtt_pass_len=%u mqtt_pass='%s' mqtt_pass_hex=%s", (unsigned)s_mqtt_len, mqtt_str, mqtt_hex);
 
-    memcpy(&cfg.plant_config, s_cfg_value, sizeof(cfg.plant_config));
-    cfg.sleep_duration = cfg.plant_config.sleep_duration;
+    const char *cfg_json = (s_cfg_value[0] != '\0') ? (const char *)s_cfg_value : "{}";
+    if (json_config_parse(cfg_json, &cfg) != ESP_OK) {
+        ESP_LOGW(TAG, "config json invalid; keeping defaults/current values");
+    }
 
     (void)app_context_set_config(&cfg);
     esp_err_t err = nvs_manager_save_config(&cfg);
@@ -485,6 +536,7 @@ static void handle_write_evt(esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *p
         (void)esp_ble_gatts_set_attr_value(handle, (uint16_t)to_copy, s_ssid_value);
         (void)xEventGroupSetBits(s_bits, PROV_BIT_SSID);
         ESP_LOGI(TAG, "ssid write len=%u", (unsigned)to_copy);
+        shorten_timeout_after_first();
         apply_if_complete();
         send_write_response(gatts_if, param, ESP_GATT_OK);
         return;
@@ -496,29 +548,28 @@ static void handle_write_evt(esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *p
         (void)esp_ble_gatts_set_attr_value(handle, (uint16_t)to_copy, s_pass_value);
         (void)xEventGroupSetBits(s_bits, PROV_BIT_PASS);
         ESP_LOGI(TAG, "pass write len=%u", (unsigned)to_copy);
+        shorten_timeout_after_first();
         apply_if_complete();
         send_write_response(gatts_if, param, ESP_GATT_OK);
         return;
     }
 
     if (handle == s_handle_table[IDX_CHAR_VAL_CFG]) {
-        if (len < PROV_MIN_CONFIG_LEN || len > PROV_MAX_CONFIG_LEN) {
+        if (len > PROV_MAX_CONFIG_LEN) {
             ESP_LOGW(TAG, "cfg len invalid (%u)", (unsigned)len);
             send_write_response(gatts_if, param, ESP_GATT_INVALID_ATTR_LEN);
             return;
         }
+        size_t to_copy = (len < (PROV_MAX_CONFIG_LEN - 1U)) ? len : (PROV_MAX_CONFIG_LEN - 1U);
         memset(s_cfg_value, 0, sizeof(s_cfg_value));
-        memcpy(s_cfg_value, value, len);
-        char cfg_hex[(3U * PROV_MAX_CONFIG_LEN) + 1U] = {0};
-        size_t off = 0;
-        for (size_t i = 0; i < PROV_MAX_CONFIG_LEN; ++i) {
-            off += (size_t)snprintf(&cfg_hex[off], sizeof(cfg_hex) - off, "%02X ", s_cfg_value[i]);
-        }
-        ESP_LOGI(TAG, "cfg bytes: %s", cfg_hex);
+        memcpy(s_cfg_value, value, to_copy);
+        s_cfg_value[to_copy] = '\0';
+        ESP_LOGI(TAG, "cfg json len=%u", (unsigned)to_copy);
 
-        (void)esp_ble_gatts_set_attr_value(handle, PROV_MAX_CONFIG_LEN, s_cfg_value);
+        (void)esp_ble_gatts_set_attr_value(handle, (uint16_t)to_copy, s_cfg_value);
         (void)xEventGroupSetBits(s_bits, PROV_BIT_CFG);
         ESP_LOGI(TAG, "config write ok");
+        shorten_timeout_after_first();
         apply_if_complete();
         send_write_response(gatts_if, param, ESP_GATT_OK);
         return;
@@ -530,6 +581,7 @@ static void handle_write_evt(esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *p
             send_write_response(gatts_if, param, ESP_GATT_INVALID_ATTR_LEN);
             return;
         }
+        (void)nvs_manager_set_first_connect_done();
         size_t to_copy = (len < sizeof(s_mqtt_pass_value)) ? len : sizeof(s_mqtt_pass_value);
         memset(s_mqtt_pass_value, 0, sizeof(s_mqtt_pass_value));
         memcpy(s_mqtt_pass_value, value, to_copy);
@@ -537,6 +589,7 @@ static void handle_write_evt(esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *p
         (void)esp_ble_gatts_set_attr_value(handle, (uint16_t)to_copy, s_mqtt_pass_value);
         (void)xEventGroupSetBits(s_bits, PROV_BIT_MQTT);
         ESP_LOGI(TAG, "mqtt pass write len=%u", (unsigned)to_copy);
+        shorten_timeout_after_first();
         apply_if_complete();
         send_write_response(gatts_if, param, ESP_GATT_OK);
         return;
@@ -563,6 +616,11 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
                 break;
             }
             memcpy(s_handle_table, param->add_attr_tab.handles, sizeof(s_handle_table));
+            memset(s_esp_mac_firstboot_value, 0, sizeof(s_esp_mac_firstboot_value));
+            build_esp_mac_firstboot_value(s_esp_mac_firstboot_value, sizeof(s_esp_mac_firstboot_value));
+            (void)esp_ble_gatts_set_attr_value(s_handle_table[IDX_CHAR_VAL_ESP_MAC],
+                                               (uint16_t)sizeof(s_esp_mac_firstboot_value),
+                                               s_esp_mac_firstboot_value);
             (void)esp_ble_gatts_start_service(s_handle_table[IDX_SVC]);
             s_service_started = true;
             start_advertising();

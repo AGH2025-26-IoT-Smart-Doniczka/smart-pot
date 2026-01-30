@@ -29,9 +29,9 @@ typedef struct {
    state_callbacks_t calib_soil_wet;
    state_callbacks_t provisioning;
    state_callbacks_t wifi_connect;
-   state_callbacks_t sync_time;
+   state_callbacks_t decision_water;
+   state_callbacks_t decision_sync;
    state_callbacks_t sensing;
-   state_callbacks_t data_decision;
    state_callbacks_t mqtt_publish;
    state_callbacks_t flash_store;
    state_callbacks_t factory_reset;

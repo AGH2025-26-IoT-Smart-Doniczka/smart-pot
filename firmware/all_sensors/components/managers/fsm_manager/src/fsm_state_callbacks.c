@@ -24,17 +24,17 @@ static const fsm_callbacks_t s_state_callbacks = {
         .on_enter = state_wifi_connect_on_enter,
         .on_exit = state_wifi_connect_on_exit,
     },
-    .sync_time = {
-        .on_enter = state_sync_time_on_enter,
-        .on_exit = state_sync_time_on_exit,
+    .decision_water = {
+        .on_enter = state_decision_water_on_enter,
+        .on_exit = state_decision_water_on_exit,
+    },
+    .decision_sync = {
+        .on_enter = state_decision_sync_on_enter,
+        .on_exit = state_decision_sync_on_exit,
     },
     .sensing = {
         .on_enter = state_sensing_on_enter,
         .on_exit = state_sensing_on_exit,
-    },
-    .data_decision = {
-        .on_enter = state_data_decision_on_enter,
-        .on_exit = state_data_decision_on_exit,
     },
     .mqtt_publish = {
         .on_enter = state_mqtt_publish_on_enter,

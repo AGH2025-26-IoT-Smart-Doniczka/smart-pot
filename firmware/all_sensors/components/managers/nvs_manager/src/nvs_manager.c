@@ -17,6 +17,7 @@ static const char *TAG = "NVS_MGR";
 #define NVS_KEY_CONFIG_SET   "cfg_set"
 #define NVS_KEY_META_NEXT    "meta_next"
 #define NVS_KEY_META_COUNT   "meta_cnt"
+#define NVS_KEY_FIRST_CONNECT "fc_done"
 
 /* =========================================================================
    SECTION: Static State
@@ -53,7 +54,7 @@ static esp_err_t ensure_nvs(void)
     return ESP_OK;
 }
 
-static bool config_is_valid(const config_t *cfg)
+static bool config_is_valid(config_t *cfg)
 {
     if (cfg == NULL) {
         return false;
@@ -71,28 +72,37 @@ static bool config_is_valid(const config_t *cfg)
         return false;
     }
 
-    if (cfg->plant_config.lux > 2U) {
-        ESP_LOGW(TAG, "config invalid: lux=%u", (unsigned)cfg->plant_config.lux);
-        return false;
-    }
-
     for (size_t i = 0; i < MOISTURE_THRESHOLD_COUNT; ++i) {
         if (cfg->plant_config.moi[i] > 100U) {
-            ESP_LOGW(TAG, "config invalid: moi[%lu]=%u", (unsigned long)i, (unsigned)cfg->plant_config.moi[i]);
-            return false;
+            ESP_LOGW(TAG, "config warning: moi[%lu]=%u (expected 0..100)",
+                     (unsigned long)i, (unsigned)cfg->plant_config.moi[i]);
         }
+    }
+
+    if (cfg->plant_config.moi[0] > cfg->plant_config.moi[1]) {
+        ESP_LOGW(TAG, "config warning: moi order min=%u max=%u",
+                 (unsigned)cfg->plant_config.moi[0], (unsigned)cfg->plant_config.moi[1]);
     }
 
     for (size_t i = 0; i < TEMP_THRESHOLD_COUNT; ++i) {
         if (cfg->plant_config.tem[i] == 0U) {
-            ESP_LOGW(TAG, "config invalid: tem[%lu]=0", (unsigned long)i);
-            return false;
+            ESP_LOGW(TAG, "config warning: tem[%lu]=0", (unsigned long)i);
         }
     }
 
-    if (cfg->sleep_duration == 0U) {
-        ESP_LOGW(TAG, "config invalid: sleep_duration=0");
-        return false;
+    if (cfg->plant_config.tem[0] > cfg->plant_config.tem[1]) {
+        ESP_LOGW(TAG, "config warning: tem order min=%u max=%u",
+                 (unsigned)cfg->plant_config.tem[0], (unsigned)cfg->plant_config.tem[1]);
+    }
+
+    if (cfg->mes == 0U) {
+        ESP_LOGW(TAG, "config warning: mes=0; using default=%u", (unsigned)DEFAULT_MES_S);
+        cfg->mes = DEFAULT_MES_S;
+    }
+
+    if (cfg->sen == 0U) {
+        ESP_LOGW(TAG, "config warning: sen=0; using default=%u", (unsigned)DEFAULT_SEN_S);
+        cfg->sen = DEFAULT_SEN_S;
     }
 
     if (cfg->soil_adc_dry == 0U || cfg->soil_adc_wet == 0U) {
@@ -321,4 +331,37 @@ esp_err_t nvs_manager_clear_samples(void)
     stored = 0;
     ESP_RETURN_ON_ERROR(save_meta(next_seq, stored), TAG, "save meta failed");
     return ESP_OK;
+}
+
+esp_err_t nvs_manager_get_first_connect(bool *out_done)
+{
+    if (out_done == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    ESP_RETURN_ON_ERROR(ensure_nvs(), TAG, "nvs not ready");
+
+    uint8_t flag = 0;
+    esp_err_t err = nvs_get_u8(s_nvs, NVS_KEY_FIRST_CONNECT, &flag);
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        *out_done = false;
+        return ESP_OK;
+    }
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    *out_done = (flag != 0U);
+    return ESP_OK;
+}
+
+esp_err_t nvs_manager_set_first_connect_done(void)
+{
+    ESP_RETURN_ON_ERROR(ensure_nvs(), TAG, "nvs not ready");
+
+    esp_err_t err = nvs_set_u8(s_nvs, NVS_KEY_FIRST_CONNECT, 1U);
+    if (err != ESP_OK) {
+        return err;
+    }
+    return nvs_commit(s_nvs);
 }
