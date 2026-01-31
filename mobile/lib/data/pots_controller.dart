@@ -95,9 +95,11 @@ class PotsController extends ChangeNotifier {
             final level = payload['lvl'] as int? ?? 4;
             final message = payload['data']?.toString() ?? '';
             final potName = log['pot_name']?.toString() ?? log['pot_id']?.toString() ?? '';
+            final potId = log['pot_id']?.toString() ?? log['potId']?.toString() ?? '';
             final timestamp = log['timestamp']?.toString();
             final date = timestamp != null ? DateTime.parse(timestamp) : DateTime.now();
             return Alert(
+              potId: potId,
               title: potName,
               description: message,
               dateTime: date,
