@@ -6,6 +6,8 @@
 #include "esp_mac.h"
 #include "esp_event.h"
 #include "esp_netif.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "mqtt_client.h"
 #include "cJSON.h"
 #include "app_context.h"
@@ -40,6 +42,7 @@ static bool s_subscribed = false;
 static bool s_publish_pending = false;
 static bool s_connected = false;
 static int s_last_pub_id = -1;
+static SemaphoreHandle_t s_publish_sem = NULL;
 static char s_uuid[13] = {0};
 static uint32_t s_device_id = 0;
 static char s_mqtt_pass[33] = {0};
@@ -322,7 +325,6 @@ static void mqtt_handle_cfg(const char *json_str)
 static void mqtt_handle_hard_reset(void)
 {
     ESP_LOGE(TAG, "HARD_RESET");
-    (void)mqtt_manager_publish_log("factory_reset", 2, "Factory reset command received");
     (void)fsm_manager_post_event(APP_EVENT_BTN1_10S, NULL, 0, 0);
 
 }
@@ -561,6 +563,9 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         case MQTT_EVENT_PUBLISHED:
             if (event->msg_id == s_last_pub_id) {
                 ESP_LOGI(TAG, "publish confirmed msg_id=%d", event->msg_id);
+                if (s_publish_sem != NULL) {
+                    (void)xSemaphoreGive(s_publish_sem);
+                }
                 (void)fsm_manager_post_event(APP_EVENT_MQTT_PUBLISHED, NULL, 0, 0);
             }
             break;
@@ -724,6 +729,46 @@ esp_err_t mqtt_manager_publish_log(const char *label, int level, const char *dat
 
     mqtt_store_pending_log(label, level, data);
     return ESP_OK;
+}
+
+esp_err_t mqtt_manager_publish_log_sync(const char *label, int level, const char *data, uint32_t timeout_ms)
+{
+    if (label == NULL || data == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (level < 1 || level > 4) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (!app_context_is_wifi_connected()) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    esp_err_t err = mqtt_client_start_internal();
+    if (err != ESP_OK) {
+        return err;
+    }
+    if (!s_connected) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (s_publish_sem == NULL) {
+        s_publish_sem = xSemaphoreCreateBinary();
+        if (s_publish_sem == NULL) {
+            return ESP_ERR_NO_MEM;
+        }
+    }
+
+    (void)xSemaphoreTake(s_publish_sem, 0);
+
+    err = mqtt_publish_log_internal(label, level, data);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    if (xSemaphoreTake(s_publish_sem, pdMS_TO_TICKS(timeout_ms)) == pdTRUE) {
+        return ESP_OK;
+    }
+    return ESP_ERR_TIMEOUT;
 }
 
 esp_err_t mqtt_manager_publish_config_log(const config_t *cfg)

@@ -275,9 +275,8 @@ static void fsm_transition_force(app_state_t next_state, const char *reason)
 static bool fsm_handle_global_interrupts(app_event_id_t event_id)
 {
     if (event_id == APP_EVENT_BTN1_10S) {
-        (void)mqtt_manager_publish_log("factory_reset", 2, "Factory reset initiated (button)");
+        (void)mqtt_manager_publish_log_sync("factory_reset", 2, "Factory reset initiated (button)", 2000);
         fsm_shutdown_display();
-        (void)mqtt_manager_stop();
         fsm_transition_force(STATE_FACTORY_RESET, "button 10s");
         return true;
     }

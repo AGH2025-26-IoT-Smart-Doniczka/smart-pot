@@ -3,8 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 class AppConfig {
-  static const String _envBaseUrl =
-      'https://unevenly-undecried-rafael.ngrok-free.dev';
+  static const String _envBaseUrl = String.fromEnvironment('BASE_URL');
 
   static String get baseUrl {
     if (_envBaseUrl.isNotEmpty) return _envBaseUrl;
