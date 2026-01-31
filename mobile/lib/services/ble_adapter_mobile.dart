@@ -88,7 +88,11 @@ class _FlutterBlueBleDevice implements BleDevice {
 }
 
 class _FlutterBlueBleAdapter implements BleAdapter {
-  final Stream<List<BleScanResult>> _scanResults = FlutterBluePlus.scanResults
+  @override
+  bool get isSupported => true;
+
+  @override
+  Stream<List<BleScanResult>> get scanResults => FlutterBluePlus.scanResults
       .map(
         (results) => results
             .map(
@@ -100,12 +104,6 @@ class _FlutterBlueBleAdapter implements BleAdapter {
             )
             .toList(),
       );
-
-  @override
-  bool get isSupported => true;
-
-  @override
-  Stream<List<BleScanResult>> get scanResults => _scanResults;
 
   @override
   Future<void> startScan({Duration timeout = const Duration(seconds: 15)}) async {

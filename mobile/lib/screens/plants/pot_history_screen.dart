@@ -165,10 +165,7 @@ class _PotHistoryScreenState extends State<PotHistoryScreen> {
       appBar: AppBar(
         title: Text('Historia: ${widget.pot.name}'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadHistory,
-          ),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadHistory),
         ],
       ),
       body: Column(
@@ -281,11 +278,14 @@ class _PotHistoryScreenState extends State<PotHistoryScreen> {
     required MetricAggregate Function(PotHistoryPoint) metricSelector,
     required bool showMinMax,
   }) {
-    final avgSpots = _buildSpots(metricSelector, (m) => m.avg);
-    final minSpots =
-        showMinMax ? _buildSpots(metricSelector, (m) => m.min) : const <FlSpot>[];
-    final maxSpots =
-        showMinMax ? _buildSpots(metricSelector, (m) => m.max) : const <FlSpot>[];
+    final chartPoints = _normalizedPoints();
+    final avgSpots = _buildSpots(chartPoints, metricSelector, (m) => m.avg);
+    final minSpots = showMinMax
+        ? _buildSpots(chartPoints, metricSelector, (m) => m.min)
+        : const <FlSpot>[];
+    final maxSpots = showMinMax
+        ? _buildSpots(chartPoints, metricSelector, (m) => m.max)
+        : const <FlSpot>[];
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -300,16 +300,16 @@ class _PotHistoryScreenState extends State<PotHistoryScreen> {
               height: 220,
               child: LineChart(
                 LineChartData(
-                  minX: _minX(),
-                  maxX: _maxX(),
+                  minX: _minX(chartPoints),
+                  maxX: _maxX(chartPoints),
                   gridData: FlGridData(show: true),
                   borderData: FlBorderData(show: false),
-                  titlesData: _buildTitles(context),
+                  titlesData: _buildTitles(context, chartPoints),
                   lineBarsData: [
                     LineChartBarData(
                       spots: avgSpots,
                       color: color,
-                      isCurved: true,
+                      isCurved: false,
                       barWidth: 2.5,
                       dotData: const FlDotData(show: false),
                     ),
@@ -363,41 +363,33 @@ class _PotHistoryScreenState extends State<PotHistoryScreen> {
   }
 
   List<FlSpot> _buildSpots(
+    List<PotHistoryPoint> points,
     MetricAggregate Function(PotHistoryPoint) metricSelector,
     double Function(MetricAggregate) valueSelector,
   ) {
-    return _points
-        .map((point) {
-          final metric = metricSelector(point);
-          return FlSpot(
-            point.timestamp.toLocal().millisecondsSinceEpoch.toDouble(),
-            valueSelector(metric),
-          );
-        })
-        .toList();
+    return points.map((point) {
+      final metric = metricSelector(point);
+      return FlSpot(
+        point.timestamp.toLocal().millisecondsSinceEpoch.toDouble(),
+        valueSelector(metric),
+      );
+    }).toList();
   }
 
-  double _minX() {
-    if (_points.isEmpty) return 0;
-    return _points
-        .first
-        .timestamp
-        .toLocal()
-        .millisecondsSinceEpoch
-        .toDouble();
+  double _minX(List<PotHistoryPoint> points) {
+    if (points.isEmpty) return 0;
+    return points.first.timestamp.toLocal().millisecondsSinceEpoch.toDouble();
   }
 
-  double _maxX() {
-    if (_points.isEmpty) return 0;
-    return _points
-        .last
-        .timestamp
-        .toLocal()
-        .millisecondsSinceEpoch
-        .toDouble();
+  double _maxX(List<PotHistoryPoint> points) {
+    if (points.isEmpty) return 0;
+    return points.last.timestamp.toLocal().millisecondsSinceEpoch.toDouble();
   }
 
-  FlTitlesData _buildTitles(BuildContext context) {
+  FlTitlesData _buildTitles(
+    BuildContext context,
+    List<PotHistoryPoint> points,
+  ) {
     final formatter = (_range.isRecent || _range.days <= 7)
         ? DateFormat('dd.MM HH:mm')
         : DateFormat('dd.MM');
@@ -416,10 +408,11 @@ class _PotHistoryScreenState extends State<PotHistoryScreen> {
         sideTitles: SideTitles(
           showTitles: true,
           reservedSize: 32,
-          interval: _labelInterval(),
+          interval: _labelInterval(points),
           getTitlesWidget: (value, meta) {
-            final date =
-                DateTime.fromMillisecondsSinceEpoch(value.toInt()).toLocal();
+            final date = DateTime.fromMillisecondsSinceEpoch(
+              value.toInt(),
+            ).toLocal();
             return SideTitleWidget(
               axisSide: meta.axisSide,
               child: Text(
@@ -433,12 +426,48 @@ class _PotHistoryScreenState extends State<PotHistoryScreen> {
     );
   }
 
-  double _labelInterval() {
-    if (_points.length <= 1) return 1;
-    final start = _minX();
-    final end = _maxX();
+  double _labelInterval(List<PotHistoryPoint> points) {
+    if (points.length <= 1) return 1;
+    final start = _minX(points);
+    final end = _maxX(points);
     final span = end - start;
     return span / 4;
+  }
+
+  List<PotHistoryPoint> _normalizedPoints() {
+    if (_points.length <= 1) return _points;
+    final List<PotHistoryPoint> merged = [];
+    for (final point in _points) {
+      if (merged.isEmpty) {
+        merged.add(point);
+        continue;
+      }
+      final last = merged.last;
+      if (last.timestamp.isAtSameMomentAs(point.timestamp)) {
+        merged[merged.length - 1] = _mergePoints(last, point);
+      } else {
+        merged.add(point);
+      }
+    }
+    return merged;
+  }
+
+  PotHistoryPoint _mergePoints(PotHistoryPoint a, PotHistoryPoint b) {
+    return PotHistoryPoint(
+      timestamp: a.timestamp,
+      airTemp: _mergeMetric(a.airTemp, b.airTemp),
+      airPressure: _mergeMetric(a.airPressure, b.airPressure),
+      soilMoisture: _mergeMetric(a.soilMoisture, b.soilMoisture),
+      illuminance: _mergeMetric(a.illuminance, b.illuminance),
+    );
+  }
+
+  MetricAggregate _mergeMetric(MetricAggregate a, MetricAggregate b) {
+    return MetricAggregate(
+      avg: (a.avg + b.avg) / 2,
+      min: a.min < b.min ? a.min : b.min,
+      max: a.max > b.max ? a.max : b.max,
+    );
   }
 
   Widget _legendDot(Color color) {
@@ -453,9 +482,7 @@ class _PotHistoryScreenState extends State<PotHistoryScreen> {
     return SizedBox(
       width: 18,
       height: 6,
-      child: CustomPaint(
-        painter: _DashPainter(color),
-      ),
+      child: CustomPaint(painter: _DashPainter(color)),
     );
   }
 }

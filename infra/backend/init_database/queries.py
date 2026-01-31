@@ -31,8 +31,8 @@ queries = [
         watering_duration_sec INTEGER,
         min_temperature NUMERIC(4,1) DEFAULT 10.0,
         max_temperature NUMERIC(4,1) DEFAULT 30.0,
-        min_moisture INTEGER DEFAULT 0,
-        max_moisture INTEGER DEFAULT 100,
+        min_moisture INTEGER DEFAULT 30,
+        max_moisture INTEGER DEFAULT 70,
         illuminance_type INTEGER DEFAULT 1
     )
     """,

@@ -23,6 +23,8 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
   final BleAdapter _adapter = bleAdapter;
 
   StreamSubscription<List<BleScanResult>>? _scanSub;
+  bool _scanInProgress = false;
+  bool _scanRetryPending = false;
   bool _permissionsGranted = false;
   bool _permissionPermanentlyDenied = false;
   bool _isSupported = true;
@@ -54,7 +56,7 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
   @override
   void dispose() {
     _scanSub?.cancel();
-    _adapter.stopScan();
+    _stopScanSafely();
     super.dispose();
   }
 
@@ -143,8 +145,13 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
   }
 
   Future<void> _startScanning() async {
+    if (_scanInProgress) {
+      return;
+    }
+    _scanInProgress = true;
     try {
       _scannedResultsById.clear();
+      await _stopScanSafely();
       await _adapter.startScan(timeout: const Duration(seconds: 15));
       debugPrint('Scan started');
       if (mounted) {
@@ -152,7 +159,36 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
       }
     } catch (e) {
       debugPrint('Error while scanning: $e');
+      _scheduleScanRetry();
+    } finally {
+      _scanInProgress = false;
     }
+  }
+
+  void _scheduleScanRetry() {
+    if (_scanRetryPending || !_permissionsGranted || !mounted) {
+      return;
+    }
+    _scanRetryPending = true;
+    Future.delayed(const Duration(seconds: 1), () async {
+      _scanRetryPending = false;
+      if (!mounted || !_permissionsGranted) return;
+      await _startScanning();
+    });
+  }
+
+  Future<void> _stopScanSafely() async {
+    try {
+      await _adapter.stopScan();
+    } catch (e) {
+      debugPrint('Error while stopping scan: $e');
+    }
+  }
+
+  Future<void> _selectDevice(BleDevice device) async {
+    await _stopScanSafely();
+    if (!mounted) return;
+    widget.onDeviceSelected(device);
   }
 
   Future<bool> _needsLegacyBluetoothPermission() async {
@@ -355,8 +391,8 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
       title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
       subtitle: Text(res.device.id),
       trailing: ElevatedButton(
-        onPressed: () {
-          widget.onDeviceSelected(res.device);
+        onPressed: () async {
+          await _selectDevice(res.device);
         },
         child: const Text("Połącz"),
       ),
@@ -394,8 +430,8 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
       title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
       subtitle: Text(device.id),
       trailing: ElevatedButton(
-        onPressed: () {
-          widget.onDeviceSelected(device);
+        onPressed: () async {
+          await _selectDevice(device);
         },
         style: ElevatedButton.styleFrom(
           backgroundColor: isConnected ? Colors.green : null,

@@ -89,6 +89,7 @@ class PotsController extends ChangeNotifier {
       final logs = (decoded['logs'] as List<dynamic>?) ?? const [];
       _alerts = logs
           .whereType<Map<String, dynamic>>()
+          .where((log) => (log['label']?.toString() ?? '') == 'alert')
           .map((log) {
             final payload = log['payload'] as Map<String, dynamic>? ?? const {};
             final level = payload['lvl'] as int? ?? 4;

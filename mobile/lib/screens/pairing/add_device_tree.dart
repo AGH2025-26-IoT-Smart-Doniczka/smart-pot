@@ -50,17 +50,47 @@ class _DeviceTreeState extends State<DeviceTree> {
           "Detected Pot ID: $_detectedPotId, Hard Reset: $_isHardReset",
         );
       } catch (e) {
+        final isIos =
+            !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+        final errorText = e.toString().toLowerCase();
+        final isTimeout = errorText.contains("timed out");
+        if (isIos && isTimeout) {
+          await device.disconnect();
+          setState(() {
+            _errorMessage = "Niepoprawny kod parowania. Spróbuj ponownie.";
+            _step = PairingStep.connecting;
+          });
+          return;
+        }
         debugPrint("Could not read reset characteristic: $e");
         _detectedPotId = null;
         _isHardReset = false;
       }
 
-      if (!await device.isBonded) {
-        try {
-          await device.createBond();
-          await Future.delayed(const Duration(seconds: 3));
-        } catch (e) {
-          print("Ostrzeżenie przy parowaniu: $e");
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+        final alreadyBonded = await device.isBonded;
+        if (!alreadyBonded) {
+          try {
+            await device.createBond();
+            await Future.delayed(const Duration(seconds: 3));
+          } catch (e) {
+            await device.disconnect();
+            setState(() {
+              _errorMessage = "Niepoprawny kod parowania. Spróbuj ponownie.";
+              _step = PairingStep.connecting;
+            });
+            return;
+          }
+        }
+
+        final bondedNow = await device.isBonded;
+        if (!bondedNow) {
+          await device.disconnect();
+          setState(() {
+            _errorMessage = "Niepoprawny kod parowania. Spróbuj ponownie.";
+            _step = PairingStep.connecting;
+          });
+          return;
         }
       }
 
@@ -70,9 +100,16 @@ class _DeviceTreeState extends State<DeviceTree> {
     } catch (e) {
       print("Błąd połączenia: $e");
       await device.disconnect();
+      final isIos =
+          !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
       setState(() {
-        _errorMessage = e.toString();
-        _step = PairingStep.failure;
+        if (isIos) {
+          _errorMessage = "Niepoprawny kod parowania. Spróbuj ponownie.";
+          _step = PairingStep.connecting;
+        } else {
+          _errorMessage = e.toString();
+          _step = PairingStep.failure;
+        }
       });
     }
   }
@@ -149,10 +186,13 @@ class _DeviceTreeState extends State<DeviceTree> {
         }
       }
 
+      final String? ssidToSend = ssid.isNotEmpty ? ssid : null;
+      final String? passToSend = pass.isNotEmpty ? pass : null;
+
       await BleService().writeConfiguration(
         device: _connectedDevice!,
-        ssid: ssid,
-        wifiPass: pass,
+        ssid: ssidToSend,
+        wifiPass: passToSend,
         mqttPass: mqttPass,
         mqttUser: mqttUser,
         customConfig: config,
@@ -208,6 +248,33 @@ class _DeviceTreeState extends State<DeviceTree> {
         return DeviceScanScreen(onDeviceSelected: _connectToDevice);
 
       case PairingStep.connecting:
+        if (_errorMessage.isNotEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red, size: 80),
+                const SizedBox(height: 20),
+                const Text(
+                  "Nie udało się sparować",
+                  style: TextStyle(fontSize: 20),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  _errorMessage,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.red),
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: _reset,
+                  child: const Text("Powrót"),
+                ),
+              ],
+            ),
+          );
+        }
         return const Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
