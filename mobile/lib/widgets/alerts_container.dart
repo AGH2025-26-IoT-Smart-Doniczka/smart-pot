@@ -47,16 +47,23 @@ class _AlertsContainerState extends State<AlertsContainer> {
         if (ctrl.alertsError != null) {
           return Center(child: Text(ctrl.alertsError!));
         }
-        if (ctrl.alerts.isEmpty) {
+        final activePotIds = ctrl.pots
+            .where((pot) => pot.isActive)
+            .map((pot) => pot.potId)
+            .toSet();
+        final filteredAlerts = ctrl.alerts
+            .where((alert) => alert.potId.isNotEmpty && activePotIds.contains(alert.potId))
+            .toList();
+        if (filteredAlerts.isEmpty) {
           return const Center(child: Text("Brak alertów"));
         }
         return ListView.builder(
           padding: EdgeInsets.zero,
-          itemCount: ctrl.alerts.length,
+          itemCount: filteredAlerts.length,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemBuilder: (context, index) {
-            final alert = ctrl.alerts[index];
+            final alert = filteredAlerts[index];
             return Card(
               margin: const EdgeInsets.symmetric(vertical: 6),
               child: ListTile(
