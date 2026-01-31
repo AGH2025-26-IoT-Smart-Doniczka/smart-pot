@@ -5,7 +5,11 @@ from .roles import ConnectionRole
 
 
 class WaterPlantRequest(BaseModel):
-    duration: int  # Duration in seconds
+   duration: int  # Duration in seconds
+
+
+class WateringStatusResponse(BaseModel):
+    is_watering: bool
 
 
 class WateringStatusResponse(BaseModel):
@@ -121,6 +125,31 @@ class PotRenameRequest(BaseModel):
         if v is not None and not v.strip():
             raise ValueError("pot_name cannot be empty")
         return v
+
+
+class PotConfigResponse(BaseModel):
+    pot_name: str
+    measure_interval_sec: int
+    send_interval_sec: int
+    watering_interval_sec: Optional[int] = None
+    max_temp: float
+    min_temp: float
+    min_moisture: int
+    max_moisture: int
+    illuminance: Literal["low", "medium", "high"]
+
+
+class PotListItemResponse(BaseModel):
+    pot_id: str
+    user_id: str
+    role: ConnectionRole
+    name: str
+    last_measure: dict | None
+    config: PotConfigResponse
+
+
+class PotListResponse(BaseModel):
+    pots: list[PotListItemResponse]
 
 
 class ChangeOwnerRequest(BaseModel):

@@ -11,9 +11,9 @@ typedef enum {
     STATE_PROVISIONING,
 
     STATE_WIFI_CONNECT,
-    STATE_SYNC_TIME,
+    STATE_DECISION_WATER,
+    STATE_DECISION_SYNC,
     STATE_SENSING,          
-    STATE_DATA_DECISION,   
     STATE_MQTT_PUBLISH,
     STATE_FLASH_STORE,
 
@@ -32,9 +32,9 @@ static inline const char* app_state_str(app_state_t s) {
         case STATE_CALIB_SOIL_WET: return "CAL_WET";
         case STATE_PROVISIONING: return "PROV";
         case STATE_WIFI_CONNECT: return "WIFI_CONN";
-        case STATE_SYNC_TIME: return "SYNC";
+        case STATE_DECISION_WATER: return "DEC_WATER";
+        case STATE_DECISION_SYNC: return "DEC_SYNC";
         case STATE_SENSING: return "SENSING";
-        case STATE_DATA_DECISION: return "Data+DECISION";
         case STATE_MQTT_PUBLISH: return "MQTT_PUBLISH";
         case STATE_FLASH_STORE: return "FLASH_STORE";
         case STATE_FACTORY_RESET: return "RESET";

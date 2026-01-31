@@ -119,16 +119,21 @@ class _PotDetailScreenState extends State<PotDetailScreen> {
     final sendInterval = viewPot.config.sendIntervalSec;
     final wateringInterval = viewPot.config.wateringIntervalSec;
     final wateringDuration = viewPot.config.wateringDurationSec;
-    _ensureAutoRefresh(sendInterval);
+    if (isActive) {
+      _ensureAutoRefresh(sendInterval);
+    } else {
+      _ensureAutoRefresh(0);
+    }
 
     return Scaffold(
       appBar: AppBar(
         title: Text(viewPot.name),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _refreshPot,
-          ),
+          if (isActive)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _refreshPot,
+            ),
           IconButton(
             icon: const Icon(Icons.show_chart),
             onPressed: () async {

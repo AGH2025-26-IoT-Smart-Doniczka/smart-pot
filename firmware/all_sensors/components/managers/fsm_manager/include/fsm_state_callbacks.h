@@ -24,14 +24,14 @@ void state_provisioning_on_exit(exit_mode_t mode);
 void state_wifi_connect_on_enter(void);
 void state_wifi_connect_on_exit(exit_mode_t mode);
 
-void state_sync_time_on_enter(void);
-void state_sync_time_on_exit(exit_mode_t mode);
+void state_decision_water_on_enter(void);
+void state_decision_water_on_exit(exit_mode_t mode);
+
+void state_decision_sync_on_enter(void);
+void state_decision_sync_on_exit(exit_mode_t mode);
 
 void state_sensing_on_enter(void);
 void state_sensing_on_exit(exit_mode_t mode);
-
-void state_data_decision_on_enter(void);
-void state_data_decision_on_exit(exit_mode_t mode);
 
 void state_mqtt_publish_on_enter(void);
 void state_mqtt_publish_on_exit(exit_mode_t mode);
@@ -44,6 +44,7 @@ void state_factory_reset_on_exit(exit_mode_t mode);
 
 void state_idle_on_enter(void);
 void state_idle_on_exit(exit_mode_t mode);
+void state_idle_kick(void);
 
 void state_deep_sleep_on_enter(void);
 void state_deep_sleep_on_exit(exit_mode_t mode);

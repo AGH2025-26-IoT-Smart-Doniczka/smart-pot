@@ -23,6 +23,7 @@ typedef struct {
     app_event_id_t ev_short;
     app_event_id_t ev_3s;
     app_event_id_t ev_10s; 
+    gpio_num_t pin;
 } btn_ctx_t;
 
 /* =========================================================================
@@ -71,8 +72,10 @@ static void button_single_click_cb(void *arg, void *data) {
 
 static void button_press_down_cb(void *arg, void *data)
 {
-    (void)arg;
-    (void)data;
+    btn_ctx_t *ctx = (btn_ctx_t *)data;
+    if (ctx != NULL) {
+        ESP_LOGI(TAG, "button-pin: %d, event: BUTTON_PRESS_DOWN", (int)ctx->pin);
+    }
     pressed_count_inc();
 }
 
@@ -147,11 +150,13 @@ esp_err_t buttons_manager_init(esp_event_loop_handle_t loop)
         .ev_short = APP_EVENT_BTN1_SHORT,
         .ev_3s = APP_EVENT_BTN1_3S,
         .ev_10s = APP_EVENT_BTN1_10S,
+        .pin = BSP_BTN1_PIN,
     };
     s_btn2 = (btn_ctx_t){
         .ev_short = APP_EVENT_BTN2_SHORT,
         .ev_3s = APP_EVENT_BTN2_3S,
         .ev_10s = APP_EVENT_BTN2_10S,
+        .pin = BSP_BTN2_PIN,
     };
 
     ESP_RETURN_ON_ERROR(init_button_gpio(&s_btn1, BSP_BTN1_PIN, BSP_BTN1_ACTIVE_LEVEL), TAG, "btn1 init");

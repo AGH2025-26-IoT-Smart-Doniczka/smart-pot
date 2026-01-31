@@ -32,3 +32,9 @@ esp_err_t nvs_manager_clear_config(void);
 esp_err_t nvs_manager_store_sample(sensor_sample_t *sample_in);
 esp_err_t nvs_manager_get_all_samples(sensor_sample_t *buffer, size_t max_items, size_t *out_count);
 esp_err_t nvs_manager_clear_samples(void);
+
+esp_err_t nvs_manager_get_first_connect(bool *out_done);
+esp_err_t nvs_manager_set_first_connect_done(void);
+
+esp_err_t nvs_manager_get_welcome_alert_sent(bool *out_done);
+esp_err_t nvs_manager_set_welcome_alert_sent(void);

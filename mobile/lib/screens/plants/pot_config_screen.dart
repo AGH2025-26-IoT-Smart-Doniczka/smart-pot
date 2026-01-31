@@ -794,7 +794,674 @@ class _PotConfigScreenState extends State<PotConfigScreen> {
           ],
         ),
       ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: FilledButton.icon(
+            onPressed: _isDisconnecting
+                ? null
+                : () => _disconnectPot(isOwner: isOwner),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            icon: const Icon(Icons.link_off),
+            label: Text(
+              _isDisconnecting
+                  ? (isOwner ? 'Usuwanie...' : 'Rozłączanie...')
+                  : (isOwner ? 'Usuń doniczkę' : 'Rozłącz doniczkę'),
+            ),
+          ),
+        ),
+      ),
     );
+
+    return isOwner
+        ? DefaultTabController(length: 2, child: scaffold)
+        : scaffold;
+  }
+
+  Widget _buildConfigurationForm(Pot pot) {
+    return SafeArea(
+      child: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text(
+              'Ustawienia ${pot.name}',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 24),
+            TextFormField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: 'Nazwa doniczki',
+                border: OutlineInputBorder(),
+              ),
+              textInputAction: TextInputAction.next,
+              validator: (_) => null,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _minTempController,
+                    decoration: const InputDecoration(
+                      labelText: 'Min. temperatura (°C)',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      signed: true,
+                      decimal: true,
+                    ),
+                    textInputAction: TextInputAction.next,
+                    validator: (value) {
+                      final parsed = double.tryParse(value?.trim() ?? '');
+                      if (parsed == null) {
+                        return 'Podaj minimalną temperaturę.';
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _maxTempController,
+                    decoration: const InputDecoration(
+                      labelText: 'Maks. temperatura (°C)',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      signed: true,
+                      decimal: true,
+                    ),
+                    textInputAction: TextInputAction.next,
+                    validator: (value) {
+                      final parsed = double.tryParse(value?.trim() ?? '');
+                      if (parsed == null) {
+                        return 'Podaj maksymalną temperaturę.';
+                      }
+                      final minParsed = double.tryParse(
+                        _minTempController.text.trim(),
+                      );
+                      if (minParsed != null && parsed <= minParsed) {
+                        return 'Musi być większa od minimalnej.';
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _minMoistureController,
+                    decoration: const InputDecoration(
+                      labelText: 'Min. wilgotność (%)',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.next,
+                    validator: (value) {
+                      final parsed = int.tryParse(value?.trim() ?? '');
+                      if (parsed == null) {
+                        return 'Podaj minimalną wilgotność.';
+                      }
+                      if (parsed < 0 || parsed > 100) {
+                        return 'Zakres 0-100.';
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _maxMoistureController,
+                    decoration: const InputDecoration(
+                      labelText: 'Maks. wilgotność (%)',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.next,
+                    validator: (value) {
+                      final parsed = int.tryParse(value?.trim() ?? '');
+                      if (parsed == null) {
+                        return 'Podaj maksymalną wilgotność.';
+                      }
+                      if (parsed < 0 || parsed > 100) {
+                        return 'Zakres 0-100.';
+                      }
+                      final minParsed = int.tryParse(
+                        _minMoistureController.text.trim(),
+                      );
+                      if (minParsed != null && parsed < minParsed) {
+                        return 'Musi być >= minimalnej.';
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _illuminance,
+              decoration: const InputDecoration(
+                labelText: 'Nasłonecznienie',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'low', child: Text('Niskie')),
+                DropdownMenuItem(value: 'medium', child: Text('Średnie')),
+                DropdownMenuItem(value: 'high', child: Text('Wysokie')),
+              ],
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() {
+                  _illuminance = value;
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+            kIsWeb
+                ? _buildWebDurationFields(
+                    label: 'Okres pomiaru',
+                    hoursController: _measureHoursController,
+                    minutesController: _measureMinutesController,
+                    secondsController: _measureSecondsController,
+                    onChanged: (value) {
+                      setState(() {
+                        _measurementIntervalSec = value;
+                      });
+                    },
+                    validator: () {
+                      if (_measurementIntervalSec <= 0) {
+                        return 'Podaj okres pomiaru.';
+                      }
+                      return null;
+                    },
+                  )
+                : TextFormField(
+                    controller: _measurementPeriodController,
+                    decoration: const InputDecoration(
+                      labelText: 'Okres pomiaru',
+                      hintText: 'Wybierz czas',
+                      border: OutlineInputBorder(),
+                    ),
+                    readOnly: true,
+                    onTap: () async {
+                      final picked = await _showDurationPicker(
+                        context,
+                        initialSeconds: _measurementIntervalSec,
+                      );
+                      if (picked == null) return;
+                      setState(() {
+                        _measurementIntervalSec = picked;
+                        _measurementPeriodController.text =
+                            _formatDurationForPicker(picked);
+                      });
+                    },
+                    textInputAction: TextInputAction.next,
+                    validator: (_) {
+                      if (_measurementIntervalSec <= 0) {
+                        return 'Podaj okres pomiaru.';
+                      }
+                      return null;
+                    },
+                  ),
+            const SizedBox(height: 16),
+            kIsWeb
+                ? _buildWebDurationFields(
+                    label: 'Okres wysyłania',
+                    hoursController: _sendHoursController,
+                    minutesController: _sendMinutesController,
+                    secondsController: _sendSecondsController,
+                    onChanged: (value) {
+                      setState(() {
+                        _sendIntervalSec = value;
+                      });
+                    },
+                    validator: () {
+                      if (_sendIntervalSec <= 0) {
+                        return 'Podaj okres wysyłania.';
+                      }
+                      return null;
+                    },
+                  )
+                : TextFormField(
+                    controller: _sendPeriodController,
+                    decoration: const InputDecoration(
+                      labelText: 'Okres wysyłania',
+                      hintText: 'Wybierz czas',
+                      border: OutlineInputBorder(),
+                    ),
+                    readOnly: true,
+                    onTap: () async {
+                      final picked = await _showDurationPicker(
+                        context,
+                        initialSeconds: _sendIntervalSec,
+                      );
+                      if (picked == null) return;
+                      setState(() {
+                        _sendIntervalSec = picked;
+                        _sendPeriodController.text = _formatDurationForPicker(
+                          picked,
+                        );
+                      });
+                    },
+                    textInputAction: TextInputAction.done,
+                    validator: (_) {
+                      if (_sendIntervalSec <= 0) {
+                        return 'Podaj okres wysyłania.';
+                      }
+                      return null;
+                    },
+                  ),
+            const SizedBox(height: 16),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Automatyczne podlewanie'),
+              subtitle: const Text(
+                'Włącz automatyczne uruchamianie podlewania.',
+              ),
+              value: _autoWateringEnabled,
+              onChanged: (value) {
+                setState(() {
+                  _autoWateringEnabled = value;
+                });
+              },
+            ),
+            const SizedBox(height: 8),
+            kIsWeb
+                ? _buildWebDurationFields(
+                    label: 'Okres podlewania',
+                    hoursController: _wateringHoursController,
+                    minutesController: _wateringMinutesController,
+                    secondsController: _wateringSecondsController,
+                    enabled: _autoWateringEnabled,
+                    onChanged: (value) {
+                      setState(() {
+                        _wateringIntervalSec = value;
+                      });
+                    },
+                    validator: () {
+                      if (!_autoWateringEnabled) {
+                        return null;
+                      }
+                      if (_wateringIntervalSec <= 0) {
+                        return 'Podaj okres podlewania.';
+                      }
+                      return null;
+                    },
+                  )
+                : TextFormField(
+                    controller: _wateringPeriodController,
+                    decoration: const InputDecoration(
+                      labelText: 'Okres podlewania',
+                      hintText: 'Wybierz czas',
+                      border: OutlineInputBorder(),
+                    ),
+                    enabled: _autoWateringEnabled,
+                    readOnly: true,
+                    onTap: _autoWateringEnabled
+                        ? () async {
+                            final picked = await _showDurationPicker(
+                              context,
+                              initialSeconds: _wateringIntervalSec,
+                            );
+                            if (picked == null) return;
+                            setState(() {
+                              _wateringIntervalSec = picked;
+                              _wateringPeriodController.text =
+                                  _formatDurationForPicker(picked);
+                            });
+                          }
+                        : null,
+                    textInputAction: TextInputAction.done,
+                    validator: (_) {
+                      if (!_autoWateringEnabled) {
+                        return null;
+                      }
+                      if (_wateringIntervalSec <= 0) {
+                        return 'Podaj okres podlewania.';
+                      }
+                      return null;
+                    },
+                  ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: _isSaving ? null : _saveConfiguration,
+              icon: const Icon(Icons.save),
+              label: Text(_isSaving ? 'Zapisywanie...' : 'Zapisz konfigurację'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPermissionsTab(Pot pot) {
+    final connections = pot.connections
+        .where((conn) => conn.role != PotRole.owner)
+        .toList();
+
+    return SafeArea(
+      child: Form(
+        key: _permissionsFormKey,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text(
+              'Uprawnienia do doniczki',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _permissionEmailController,
+              decoration: const InputDecoration(
+                labelText: 'Email użytkownika',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              validator: (value) {
+                final trimmed = value?.trim() ?? '';
+                if (trimmed.isEmpty) {
+                  return 'Podaj email.';
+                }
+                if (!trimmed.contains('@')) {
+                  return 'Podaj poprawny email.';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<PotRole>(
+              value: _newPermissionRole,
+              decoration: const InputDecoration(
+                labelText: 'Uprawnienia',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(
+                  value: PotRole.viewer,
+                  child: Text('Tylko odczyt'),
+                ),
+                DropdownMenuItem(
+                  value: PotRole.editor,
+                  child: Text('Odczyt i konfigurowanie'),
+                ),
+              ],
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() {
+                  _newPermissionRole = value;
+                });
+              },
+            ),
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: _isPermissionsBusy ? null : () => _addPermission(pot),
+              child: Text(_isPermissionsBusy ? 'Dodawanie...' : 'Dodaj dostęp'),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Lista użytkowników',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            if (connections.isEmpty)
+              Text(
+                'Brak dodatkowych użytkowników.',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade600),
+              )
+            else
+              ...connections.map(
+                (conn) => Card(
+                  child: ListTile(
+                    title: Text(conn.email.isEmpty ? conn.userId : conn.email),
+                    subtitle: Text('Rola: ${potRoleToString(conn.role)}'),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.edit),
+                      onPressed: () => _showEditPermissionDialog(pot, conn),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _addPermission(Pot pot) async {
+    if (!_permissionsFormKey.currentState!.validate()) {
+      return;
+    }
+
+    final email = _permissionEmailController.text.trim();
+    final existingById = pot.connections.any((conn) => conn.userId == email);
+    final existingByEmail = pot.connections.any(
+      (conn) => conn.email.toLowerCase() == email.toLowerCase(),
+    );
+    if (existingById || existingByEmail) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Użytkownik już ma dostęp. Użyj edycji.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isPermissionsBusy = true;
+    });
+
+    try {
+      await context.read<PotsController>().addPotConnection(
+        pot.potId,
+        email: email,
+        role: potRoleToString(_newPermissionRole).toUpperCase(),
+      );
+      _permissionEmailController.clear();
+      setState(() {
+        _newPermissionRole = PotRole.viewer;
+      });
+
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Nie udało się dodać dostępu: $e')),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isPermissionsBusy = false;
+      });
+    }
+  }
+
+  Future<void> _showEditPermissionDialog(Pot pot, PotConnection conn) async {
+    PotRole selectedRole = conn.role;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Edytuj uprawnienia'),
+              content: DropdownButtonFormField<PotRole>(
+                value: selectedRole == PotRole.owner
+                    ? PotRole.editor
+                    : selectedRole,
+                decoration: const InputDecoration(
+                  labelText: 'Uprawnienia',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: PotRole.viewer,
+                    child: Text('Tylko odczyt'),
+                  ),
+                  DropdownMenuItem(
+                    value: PotRole.editor,
+                    child: Text('Odczyt i konfigurowanie'),
+                  ),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  setDialogState(() {
+                    selectedRole = value;
+                  });
+                },
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Anuluj'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    final shouldRemove = await _confirmRemove();
+                    if (!shouldRemove) return;
+                    if (!mounted) return;
+                    await _removePermission(pot, conn);
+                    if (mounted) {
+                      Navigator.of(dialogContext).pop();
+                    }
+                  },
+                  child: Text(
+                    'Usuń',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ),
+                FilledButton(
+                  onPressed: () async {
+                    await _updatePermission(pot, conn, selectedRole);
+                    if (mounted) {
+                      Navigator.of(dialogContext).pop();
+                    }
+                  },
+                  child: const Text('Zapisz'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _updatePermission(
+    Pot pot,
+    PotConnection conn,
+    PotRole newRole,
+  ) async {
+    setState(() {
+      _isPermissionsBusy = true;
+    });
+
+    try {
+      await context.read<PotsController>().updatePotConnection(
+        pot.potId,
+        email: conn.email.isEmpty ? conn.userId : conn.email,
+        role: potRoleToString(newRole).toUpperCase(),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Nie udało się zmienić roli: $e')));
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isPermissionsBusy = false;
+      });
+    }
+  }
+
+  Future<void> _removePermission(Pot pot, PotConnection conn) async {
+    setState(() {
+      _isPermissionsBusy = true;
+    });
+
+    try {
+      await context.read<PotsController>().deletePotConnection(
+        pot.potId,
+        email: conn.email.isEmpty ? conn.userId : conn.email,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Nie udało się usunąć dostępu: $e')),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isPermissionsBusy = false;
+      });
+    }
+  }
+
+  Future<bool> _confirmRemove() async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) {
+            return AlertDialog(
+              title: const Text('Usunąć użytkownika?'),
+              content: const Text('Użytkownik straci dostęp do doniczki.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('Anuluj'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  child: const Text('Usuń'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+  }
+
+  void _redirectIfViewer() {
+    final currentUserId = context.read<AuthController>().currentUser?.id ?? '';
+    final pot = context.read<PotsController>().pots.firstWhere(
+      (p) => p.potId == widget.pot.potId,
+      orElse: () => widget.pot,
+    );
+    final role = pot.role != PotRole.unknown
+        ? pot.role
+        : _resolveRole(pot, currentUserId);
+    if (role == PotRole.viewer || role == PotRole.unknown) {
+      Navigator.of(context).maybePop();
+    }
+  }
+
+  PotRole _resolveRole(Pot pot, String userId) {
+    if (userId.isEmpty) return PotRole.unknown;
+    final match = pot.connections.firstWhere(
+      (conn) => conn.userId == userId,
+      orElse: () => const PotConnection(
+        id: '',
+        userId: '',
+        email: '',
+        role: PotRole.unknown,
+      ),
+    );
+    return match.role;
   }
 
   Widget _buildPermissionsTab(Pot pot) {

@@ -4,6 +4,7 @@
 #include "esp_log.h"
 #include "bsp_init.h"
 #include "app_context.h"
+#include "nvs_manager.h"
 
 static const char *TAG = "APP_CTX";
 
@@ -126,6 +127,76 @@ bool app_context_is_time_synced(void)
     return synced;
 }
 
+void app_context_set_has_prior_connect(bool connected_before)
+{
+    if (!s_initialized || !lock_ctx(pdMS_TO_TICKS(20))) {
+        return;
+    }
+    s_ctx.has_prior_connect = connected_before;
+    unlock_ctx();
+
+    if (connected_before) {
+        (void)nvs_manager_set_first_connect_done();
+    }
+}
+
+bool app_context_has_prior_connect(void)
+{
+    bool connected_before = false;
+    if (!s_initialized) {
+        return false;
+    }
+    if (lock_ctx(pdMS_TO_TICKS(20))) {
+        connected_before = s_ctx.has_prior_connect;
+        unlock_ctx();
+    }
+    return connected_before;
+}
+
+void app_context_set_force_sync_on_wakeup(bool force_sync)
+{
+    if (!s_initialized || !lock_ctx(pdMS_TO_TICKS(20))) {
+        return;
+    }
+    s_ctx.force_sync_on_wakeup = force_sync;
+    unlock_ctx();
+}
+
+bool app_context_force_sync_on_wakeup(void)
+{
+    bool force_sync = false;
+    if (!s_initialized) {
+        return false;
+    }
+    if (lock_ctx(pdMS_TO_TICKS(20))) {
+        force_sync = s_ctx.force_sync_on_wakeup;
+        unlock_ctx();
+    }
+    return force_sync;
+}
+
+void app_context_set_display_on_wakeup(bool enable)
+{
+    if (!s_initialized || !lock_ctx(pdMS_TO_TICKS(20))) {
+        return;
+    }
+    s_ctx.display_on_wakeup = enable;
+    unlock_ctx();
+}
+
+bool app_context_display_on_wakeup(void)
+{
+    bool enable = false;
+    if (!s_initialized) {
+        return false;
+    }
+    if (lock_ctx(pdMS_TO_TICKS(20))) {
+        enable = s_ctx.display_on_wakeup;
+        unlock_ctx();
+    }
+    return enable;
+}
+
 uint32_t app_context_next_data_block_seq(void)
 {
     uint32_t val = 0;
@@ -181,6 +252,28 @@ esp_err_t app_context_get_sensor_data(sensor_data_t *out)
     *out = s_ctx.sensor_data;
     unlock_ctx();
     return ESP_OK;
+}
+
+void app_context_set_soil_status(soil_status_t status)
+{
+    if (!s_initialized || !lock_ctx(pdMS_TO_TICKS(20))) {
+        return;
+    }
+    s_ctx.soil_status = status;
+    unlock_ctx();
+}
+
+soil_status_t app_context_get_soil_status(void)
+{
+    soil_status_t status = SOIL_STATUS_UNKNOWN;
+    if (!s_initialized) {
+        return SOIL_STATUS_UNKNOWN;
+    }
+    if (lock_ctx(pdMS_TO_TICKS(20))) {
+        status = s_ctx.soil_status;
+        unlock_ctx();
+    }
+    return status;
 }
 
 esp_err_t app_context_set_display_bus(i2c_master_bus_handle_t bus)

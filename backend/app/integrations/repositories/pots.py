@@ -148,6 +148,89 @@ def get_pot_owner_username(pot_id: str) -> str | None:
             return None
 
 
+def user_exists(user_id: str) -> bool:
+    conn = get_connection()
+    try:
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT 1
+                    FROM users
+                    WHERE user_id = %s;
+                    """,
+                    (user_id,),
+                )
+                row = cur.fetchone()
+                return row is not None
+    finally:
+        conn.close()
+
+
+def pot_has_owner(pot_id: str) -> tuple[Any, ...] | None:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                    SELECT user_id
+                    FROM connections
+                    WHERE pot_id = %s
+                    AND role = %s
+                    LIMIT 1;
+                    """,
+                (pot_id, ConnectionRole.OWNER.value),
+            )
+            return cur.fetchone()
+
+
+def get_mqtt_password(pot_id: str) -> str | None:
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT mqtt_password
+                FROM pots
+                WHERE pot_id = %s;
+                """,
+                (pot_id,),
+            )
+            row = cur.fetchone()
+            return row["mqtt_password"] if row else None
+
+
+def set_mqtt_password(pot_id: str, mqtt_password: str) -> None:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE pots
+                SET mqtt_password = %s
+                WHERE pot_id = %s;
+                """,
+                (mqtt_password, pot_id),
+            )
+
+
+def get_pot_owner_username(pot_id: str) -> str | None:
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                    SELECT u.username
+                    FROM connections c
+                    JOIN users u ON c.user_id = u.user_id
+                    WHERE c.pot_id = %s
+                      AND c.role = %s
+                    LIMIT 1;
+                    """,
+                (pot_id, ConnectionRole.OWNER.value),
+            )
+            row = cur.fetchone()
+            if row:
+                return row["username"]
+            return None
+
+
 def insert_connection(pot_id: str, user_id: str, has_owner: bool) -> dict[str, Any] | None:
     if not user_exists(user_id):
         raise ValueError(f"User with id {user_id} does not exist")
@@ -975,6 +1058,7 @@ def apply_hard_reset(pot_id: str, new_owner_id: str, mqtt_password: str) -> None
                     """,
                     (pot_id, pot_id, mqtt_password),
                 )
+                rows = cur.fetchall()
 
                 cur.execute(
                     """

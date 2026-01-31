@@ -441,6 +441,51 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
     );
   }
 
+  Widget _buildSectionHeader(String title, IconData icon, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: color,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildKnownDeviceTile(
+    BleDevice device, {
+    required bool isConnected,
+  }) {
+    final name = device.name.isNotEmpty ? device.name : device.id;
+
+    return ListTile(
+      leading: Icon(
+        isConnected ? Icons.bluetooth_connected : Icons.bluetooth,
+        color: isConnected ? Colors.green : Colors.blue,
+      ),
+      title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+      subtitle: Text(device.id),
+      trailing: ElevatedButton(
+        onPressed: () {
+          widget.onDeviceSelected(device);
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isConnected ? Colors.green : null,
+        ),
+        child: Text(isConnected ? "Użyj" : "Połącz"),
+      ),
+    );
+  }
+
   Widget _buildPermissionInfo() {
     if (_permissionPermanentlyDenied) {
       return Center(

@@ -5,6 +5,7 @@ cmake_minimum_required(VERSION 3.16)
 # Add nested component roots (managers/, drivers/)
 set(EXTRA_COMPONENT_DIRS
 	${CMAKE_CURRENT_LIST_DIR}/components
+	${CMAKE_CURRENT_LIST_DIR}/components/utils/json_parser
 	${CMAKE_CURRENT_LIST_DIR}/components/managers
 	${CMAKE_CURRENT_LIST_DIR}/components/drivers
 )

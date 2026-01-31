@@ -18,6 +18,7 @@ typedef enum {
     // Initialization 
     APP_EVENT_CONFIG_LOADED = 0,    
     APP_EVENT_NO_CONFIG,           
+    APP_EVENT_NEEDS_PROVISIONING,
 
     // Provisioning
     APP_EVENT_PROV_CONNECTED,       
@@ -28,19 +29,23 @@ typedef enum {
     // Connectivity
     APP_EVENT_WIFI_CONNECTED,       
     APP_EVENT_WIFI_DISCONNECTED,    
-    APP_EVENT_TIME_SYNC_DONE,       
-
     // Sensing
     APP_EVENT_SENSORS_DATA_READY, 
       APP_EVENT_CALIB_TIMEOUT,
     
-    // Decision
-    APP_EVENT_DECISION_MQTT,
-    APP_EVENT_DECISION_STORAGE,
+   // Decision
+   APP_EVENT_DECISION_STORAGE,
+   APP_EVENT_DECISION_WATER_DONE,
+   APP_EVENT_DECISION_SYNC_WIFI,
+   APP_EVENT_DECISION_SYNC_STORAGE,
 
-    // Data Handling
-    APP_EVENT_MQTT_PUBLISHED,      
-    APP_EVENT_STORAGE_SAVED,        
+   // Data Handling
+   APP_EVENT_MQTT_PUBLISHED,      
+   APP_EVENT_STORAGE_SAVED,        
+
+   // Actuation
+   APP_EVENT_WATERING_REQUEST,
+   APP_EVENT_WATERING_DONE,
 
    // Idle
    APP_EVENT_IDLE_TIMEOUT,
@@ -60,4 +65,7 @@ typedef enum {
    ========================================================================= */
 typedef sensor_data_t sensor_event_data_t;
 
+typedef struct {
+   uint16_t duration_s;
+} watering_request_t;
 

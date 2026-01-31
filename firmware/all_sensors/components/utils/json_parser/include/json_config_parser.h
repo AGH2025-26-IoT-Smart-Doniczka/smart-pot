@@ -1,6 +1,7 @@
 #pragma once
 
 #include "esp_err.h"
+#include "app_types.h"
 
 #ifdef __cplusplus
 #error "This project uses C only."
@@ -9,6 +10,5 @@
 /* =========================================================================
    SECTION: API
    ========================================================================= */
-esp_err_t wifi_manager_init(void);
-esp_err_t wifi_manager_start(void);
-void wifi_manager_stop(void);
+
+esp_err_t json_config_parse(const char *json_str_in, config_t *cfg_in_out);

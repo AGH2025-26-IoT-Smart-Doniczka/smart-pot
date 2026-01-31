@@ -159,13 +159,21 @@ class _PotHistoryScreenState extends State<PotHistoryScreen> {
       ),
     );
     final viewPot = currentPot ?? widget.pot;
-    _ensureAutoRefresh(viewPot.config.sendIntervalSec);
+    if (viewPot.isActive) {
+      _ensureAutoRefresh(viewPot.config.sendIntervalSec);
+    } else {
+      _ensureAutoRefresh(0);
+    }
 
     return Scaffold(
       appBar: AppBar(
         title: Text('Historia: ${widget.pot.name}'),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadHistory),
+          if (viewPot.isActive)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _loadHistory,
+            ),
         ],
       ),
       body: Column(
